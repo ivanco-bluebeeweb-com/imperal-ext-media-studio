@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img"
+     aria-label="Media Studio">
+  <!-- Original glyph: a picture frame with a sun and a mountain peak,
+       the generic "image" pictogram, in a single accent color on a
+       transparent background. Not a copy of any provider's brand mark. -->
+  <rect x="2.5" y="4" width="19" height="16" rx="2.4" fill="none"
+        stroke="#6C5CE7" stroke-width="1.8"/>
+  <circle cx="8.2" cy="9.4" r="1.9" fill="#6C5CE7"/>
+  <path d="M4.2 17.5 L9.6 11.6 L13.4 15.4 L16.4 12.1 L19.8 17.5 Z"
+        fill="#6C5CE7" opacity="0.85"/>
+</svg>

@@ -1,0 +1,16 @@
+"""Structured error codes.
+
+Every ActionResult.error() call in this extension carries one of these,
+same discipline as the Asana connector: an unstructured error gets stamped
+EXT_UNSTRUCTURED_ERROR by the kernel, turning a precise failure into
+un-actionable prose.
+"""
+
+MEDIA_KEY_NOT_CONFIGURED = "MEDIA_KEY_NOT_CONFIGURED"
+MEDIA_PACKAGE_NOT_FOUND = "MEDIA_PACKAGE_NOT_FOUND"
+MEDIA_ASSET_NOT_FOUND = "MEDIA_ASSET_NOT_FOUND"
+MEDIA_ALREADY_GENERATING = "MEDIA_ALREADY_GENERATING"
+MEDIA_EMPTY_BRIEF = "MEDIA_EMPTY_BRIEF"
+MEDIA_PROVIDER_ERROR = "MEDIA_PROVIDER_ERROR"
+MEDIA_PROVIDER_TIMEOUT = "MEDIA_PROVIDER_TIMEOUT"
+MEDIA_INVALID_ROLE = "MEDIA_INVALID_ROLE"

@@ -1,0 +1,1563 @@
+{
+  "manifest_schema_version": 3,
+  "sdk_version": "5.9.13",
+  "app_id": "media-studio",
+  "version": "1.0.0",
+  "name": "Media Studio",
+  "description": "Turn an article brief into a ready-to-publish image package -- featured image plus inline supporting images, with alt text -- using your own Magnific AI (Mystic) API key. Provider-agnostic media package model so other generators can plug in later.",
+  "icon": "icon.svg",
+  "actions_explicit": true,
+  "system": false,
+  "capabilities": [
+    "media:read",
+    "media:write"
+  ],
+  "tools": [
+    {
+      "name": "create_media_brief",
+      "description": "Create a new image brief for an article: site, title, summary and how many inline images besides the featured image. Creates the package in draft status -- call generate_media_package next to actually produce the images.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "site": {
+            "default": "",
+            "description": "Which site this article is for, e.g. 'g4s.md'. Free text -- used for filtering, not validated against a connected-sites list.",
+            "title": "Site",
+            "type": "string"
+          },
+          "article_title": {
+            "default": "",
+            "description": "The article's working title.",
+            "title": "Article Title",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "description": "Short summary of the article's content/angle -- used as the basis for the image prompt(s).",
+            "title": "Summary",
+            "type": "string"
+          },
+          "style_direction": {
+            "default": "",
+            "description": "Optional style guidance, e.g. 'industrial, realistic, no text in image, blue/grey palette'.",
+            "title": "Style Direction",
+            "type": "string"
+          },
+          "inline_count": {
+            "default": 2,
+            "description": "How many inline supporting images besides the featured image (0-8).",
+            "maximum": 8,
+            "minimum": 0,
+            "title": "Inline Count",
+            "type": "integer"
+          }
+        },
+        "title": "CreateMediaBriefParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MediaAsset": {
+            "description": "One image within a package -- featured or one of the inline slots.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "default": "",
+                "title": "Status",
+                "type": "string"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "role": {
+                "default": "",
+                "title": "Role",
+                "type": "string"
+              },
+              "provider": {
+                "default": "",
+                "title": "Provider",
+                "type": "string"
+              },
+              "provider_task_id": {
+                "default": "",
+                "title": "Provider Task Id",
+                "type": "string"
+              },
+              "image_url": {
+                "default": "",
+                "title": "Image Url",
+                "type": "string"
+              },
+              "prompt": {
+                "default": "",
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_text": {
+                "default": "",
+                "title": "Alt Text",
+                "type": "string"
+              },
+              "caption": {
+                "default": "",
+                "title": "Caption",
+                "type": "string"
+              },
+              "error_message": {
+                "default": "",
+                "title": "Error Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MediaAsset",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "A brief plus its generated (or in-progress) image assets.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site": {
+            "default": "",
+            "title": "Site",
+            "type": "string"
+          },
+          "article_title": {
+            "default": "",
+            "title": "Article Title",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "style_direction": {
+            "default": "",
+            "title": "Style Direction",
+            "type": "string"
+          },
+          "inline_count": {
+            "default": 0,
+            "title": "Inline Count",
+            "type": "integer"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/$defs/MediaAsset"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaPackage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.create_media_brief",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "generate_media_package",
+      "description": "Generate all pending images for a media package via Magnific (Mystic). Runs in the background -- you get an immediate acknowledgement, then a follow-up message when the images are ready (or on failure).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "package_id": {
+            "default": "",
+            "description": "The media package to generate images for. Get this from create_media_brief or list_media_packages.",
+            "title": "Package Id",
+            "type": "string"
+          }
+        },
+        "title": "GenerateMediaPackageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MediaAsset": {
+            "description": "One image within a package -- featured or one of the inline slots.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "default": "",
+                "title": "Status",
+                "type": "string"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "role": {
+                "default": "",
+                "title": "Role",
+                "type": "string"
+              },
+              "provider": {
+                "default": "",
+                "title": "Provider",
+                "type": "string"
+              },
+              "provider_task_id": {
+                "default": "",
+                "title": "Provider Task Id",
+                "type": "string"
+              },
+              "image_url": {
+                "default": "",
+                "title": "Image Url",
+                "type": "string"
+              },
+              "prompt": {
+                "default": "",
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_text": {
+                "default": "",
+                "title": "Alt Text",
+                "type": "string"
+              },
+              "caption": {
+                "default": "",
+                "title": "Caption",
+                "type": "string"
+              },
+              "error_message": {
+                "default": "",
+                "title": "Error Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MediaAsset",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "A brief plus its generated (or in-progress) image assets.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site": {
+            "default": "",
+            "title": "Site",
+            "type": "string"
+          },
+          "article_title": {
+            "default": "",
+            "title": "Article Title",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "style_direction": {
+            "default": "",
+            "title": "Style Direction",
+            "type": "string"
+          },
+          "inline_count": {
+            "default": 0,
+            "title": "Inline Count",
+            "type": "integer"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/$defs/MediaAsset"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaPackage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.generate_media_package",
+      "background": true,
+      "long_running": true,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "list_media_packages",
+      "description": "List media packages, optionally filtered by site or status.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "site": {
+            "default": "",
+            "description": "Filter by site. Omit to list all.",
+            "title": "Site",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "description": "Filter by status: draft, generating, ready, failed. Omit for all statuses.",
+            "title": "Status",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 200,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListMediaPackagesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MediaAsset": {
+            "description": "One image within a package -- featured or one of the inline slots.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "default": "",
+                "title": "Status",
+                "type": "string"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "role": {
+                "default": "",
+                "title": "Role",
+                "type": "string"
+              },
+              "provider": {
+                "default": "",
+                "title": "Provider",
+                "type": "string"
+              },
+              "provider_task_id": {
+                "default": "",
+                "title": "Provider Task Id",
+                "type": "string"
+              },
+              "image_url": {
+                "default": "",
+                "title": "Image Url",
+                "type": "string"
+              },
+              "prompt": {
+                "default": "",
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_text": {
+                "default": "",
+                "title": "Alt Text",
+                "type": "string"
+              },
+              "caption": {
+                "default": "",
+                "title": "Caption",
+                "type": "string"
+              },
+              "error_message": {
+                "default": "",
+                "title": "Error Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MediaAsset",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "A brief plus its generated (or in-progress) image assets.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site": {
+            "default": "",
+            "title": "Site",
+            "type": "string"
+          },
+          "article_title": {
+            "default": "",
+            "title": "Article Title",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "style_direction": {
+            "default": "",
+            "title": "Style Direction",
+            "type": "string"
+          },
+          "inline_count": {
+            "default": 0,
+            "title": "Inline Count",
+            "type": "integer"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/$defs/MediaAsset"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaPackage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.list_media_packages",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "get_media_package",
+      "description": "Get one media package in full, including every asset's status, image URL, alt text and caption.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "package_id": {
+            "default": "",
+            "description": "The media package id.",
+            "title": "Package Id",
+            "type": "string"
+          }
+        },
+        "title": "GetMediaPackageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MediaAsset": {
+            "description": "One image within a package -- featured or one of the inline slots.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "default": "",
+                "title": "Status",
+                "type": "string"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "role": {
+                "default": "",
+                "title": "Role",
+                "type": "string"
+              },
+              "provider": {
+                "default": "",
+                "title": "Provider",
+                "type": "string"
+              },
+              "provider_task_id": {
+                "default": "",
+                "title": "Provider Task Id",
+                "type": "string"
+              },
+              "image_url": {
+                "default": "",
+                "title": "Image Url",
+                "type": "string"
+              },
+              "prompt": {
+                "default": "",
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_text": {
+                "default": "",
+                "title": "Alt Text",
+                "type": "string"
+              },
+              "caption": {
+                "default": "",
+                "title": "Caption",
+                "type": "string"
+              },
+              "error_message": {
+                "default": "",
+                "title": "Error Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MediaAsset",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "A brief plus its generated (or in-progress) image assets.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site": {
+            "default": "",
+            "title": "Site",
+            "type": "string"
+          },
+          "article_title": {
+            "default": "",
+            "title": "Article Title",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "style_direction": {
+            "default": "",
+            "title": "Style Direction",
+            "type": "string"
+          },
+          "inline_count": {
+            "default": 0,
+            "title": "Inline Count",
+            "type": "integer"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/$defs/MediaAsset"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaPackage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.get_media_package",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "regenerate_asset",
+      "description": "Re-generate a single image within a package (e.g. just the featured image) without touching the other assets. Optionally override the prompt for this one image.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "package_id": {
+            "default": "",
+            "description": "The media package id.",
+            "title": "Package Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "description": "Which asset to regenerate, e.g. 'featured' or 'inline_1'. Get valid roles from get_media_package.",
+            "title": "Role",
+            "type": "string"
+          },
+          "prompt_override": {
+            "default": "",
+            "description": "Optional replacement prompt for just this asset. Omit to reuse the brief's original prompt for this role.",
+            "title": "Prompt Override",
+            "type": "string"
+          }
+        },
+        "title": "RegenerateAssetParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One image within a package -- featured or one of the inline slots.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          },
+          "provider": {
+            "default": "",
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_task_id": {
+            "default": "",
+            "title": "Provider Task Id",
+            "type": "string"
+          },
+          "image_url": {
+            "default": "",
+            "title": "Image Url",
+            "type": "string"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "alt_text": {
+            "default": "",
+            "title": "Alt Text",
+            "type": "string"
+          },
+          "caption": {
+            "default": "",
+            "title": "Caption",
+            "type": "string"
+          },
+          "error_message": {
+            "default": "",
+            "title": "Error Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaAsset",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.regenerate_asset",
+      "background": true,
+      "long_running": true,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "update_asset_meta",
+      "description": "Edit the alt text and/or caption of one asset within a media package, without regenerating the image itself.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "package_id": {
+            "default": "",
+            "description": "The media package id.",
+            "title": "Package Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "description": "Which asset to edit, e.g. 'featured'.",
+            "title": "Role",
+            "type": "string"
+          },
+          "alt_text": {
+            "default": "",
+            "description": "New alt text. Omit to keep unchanged.",
+            "title": "Alt Text",
+            "type": "string"
+          },
+          "caption": {
+            "default": "",
+            "description": "New caption. Omit to keep unchanged.",
+            "title": "Caption",
+            "type": "string"
+          }
+        },
+        "title": "UpdateAssetMetaParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One image within a package -- featured or one of the inline slots.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          },
+          "provider": {
+            "default": "",
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_task_id": {
+            "default": "",
+            "title": "Provider Task Id",
+            "type": "string"
+          },
+          "image_url": {
+            "default": "",
+            "title": "Image Url",
+            "type": "string"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "alt_text": {
+            "default": "",
+            "title": "Alt Text",
+            "type": "string"
+          },
+          "caption": {
+            "default": "",
+            "title": "Caption",
+            "type": "string"
+          },
+          "error_message": {
+            "default": "",
+            "title": "Error Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaAsset",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.update_asset_meta",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "delete_media_package",
+      "description": "Permanently delete a media package and all of its asset records. Does not delete images already hosted on Magnific's own servers -- only the package record inside Media Studio.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "delete:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "package_id": {
+            "default": "",
+            "description": "The media package id to delete.",
+            "title": "Package Id",
+            "type": "string"
+          }
+        },
+        "title": "DeleteMediaPackageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a delete, phrased so the narrator can state what changed.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "deleted": {
+            "default": false,
+            "title": "Deleted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "DeleteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.delete_media_package",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    }
+  ],
+  "signals": [],
+  "schedules": [],
+  "required_scopes": [],
+  "icon_size_bytes": 597,
+  "lifecycle": {
+    "health_check": {
+      "interval_sec": 60
+    }
+  },
+  "secrets": [
+    {
+      "name": "magnific_api_key",
+      "description": "Your Magnific API key -- Magnific dashboard -> Organization Settings -> API Keys -> Create API key. Requires a Business or Enterprise Magnific plan.",
+      "required": true,
+      "write_mode": "user",
+      "max_bytes": 200,
+      "scope": "user",
+      "rotation_hint_days": 90
+    },
+    {
+      "name": "magnific_webhook_secret",
+      "description": "Webhook signing secret shown alongside your Magnific API key. Stored for future use -- v1 polls task status instead of relying on inbound webhooks, so this is not read by any handler yet.",
+      "required": false,
+      "write_mode": "user",
+      "max_bytes": 200,
+      "scope": "user",
+      "rotation_hint_days": 90
+    }
+  ],
+  "panels": [
+    {
+      "panel_id": "secrets",
+      "slot": "right",
+      "title": "Secrets",
+      "tree": {},
+      "icon": "KeyRound",
+      "refresh": "manual",
+      "center_overlay": false
+    },
+    {
+      "panel_id": "packages",
+      "slot": "left",
+      "title": "Media Packages",
+      "tree": {},
+      "icon": "",
+      "refresh": "on_event:media-studio.create_media_brief,media-studio.generate_media_package,media-studio.delete_media_package",
+      "center_overlay": false,
+      "default_width": 300,
+      "min_width": 220,
+      "max_width": 420
+    },
+    {
+      "panel_id": "editor",
+      "slot": "center",
+      "title": "Media Package Editor",
+      "tree": {},
+      "icon": "",
+      "refresh": "on_event:media-studio.generate_media_package,media-studio.regenerate_asset,media-studio.update_asset_meta",
+      "center_overlay": true
+    }
+  ]
+}
