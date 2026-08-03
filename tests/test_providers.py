@@ -29,7 +29,7 @@ async def test_connect_magnific_empty_key_rejected(ctx):
 
 @pytest.mark.asyncio
 async def test_connect_magnific_validates_before_storing(ctx):
-    ctx.http.mock_get("/v1/analytics/team-members", {"error": "unauthorized"}, status=401)
+    ctx.http.mock_get("/v1/creations/recent", {"error": "unauthorized"}, status=401)
     result = await p.connect_magnific(ctx, ConnectMagnificParams(api_key="bad-key"))
     assert result.status == "error"
     assert result.error_code == c.MEDIA_PROVIDER_KEY_INVALID
@@ -38,7 +38,7 @@ async def test_connect_magnific_validates_before_storing(ctx):
 
 @pytest.mark.asyncio
 async def test_connect_magnific_stores_valid_key(ctx):
-    ctx.http.mock_get("/v1/analytics/team-members", {"data": []}, status=200)
+    ctx.http.mock_get("/v1/creations/recent", {"data": []}, status=200)
     result = await p.connect_magnific(ctx, ConnectMagnificParams(api_key="good-key"))
     assert result.status == "success"
     assert result.data.connected is True

@@ -52,12 +52,18 @@ def _headers(api_key: str) -> dict:
 async def validate_api_key(ctx, api_key: str) -> None:
     """Verify a key without generating anything or consuming image credits.
 
-    Magnific documents this authenticated discovery endpoint at
-    ``GET /v1/analytics/team-members``. A successful response proves that the
-    key reaches a Magnific team; no response data is persisted or shown.
+    CORRECTED CHOICE OF ENDPOINT (was a real bug, not a hypothetical one).
+    v1 of this validated against ``GET /v1/analytics/team-members``, which
+    Magnific's own docs mark "Available exclusively for Business and
+    Enterprise plans" -- so a perfectly valid key on any other plan gets a
+    403 there, and this code reported that as "the key is invalid", which
+    is wrong. ``GET /v1/creations/recent`` (Creations API) has no plan
+    restriction documented, resolves identity from the key alone, and
+    explicitly "does not consume credits" -- a 2xx there proves the key
+    works for any plan, so it replaces the analytics call here.
     """
     resp = await ctx.http.get(
-        f"{BASE_URL}/v1/analytics/team-members",
+        f"{BASE_URL}/v1/creations/recent",
         headers=_headers(api_key),
         timeout=30,
     )
