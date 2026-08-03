@@ -74,12 +74,24 @@ async def validate_api_key(ctx, api_key: str) -> None:
         )
 
 
-async def create_mystic_job(ctx, api_key: str, prompt: str, *, num_images: int = 1) -> str:
-    """POST /v1/ai/mystic -- returns the provider task id."""
+async def create_mystic_job(
+    ctx, api_key: str, prompt: str, *, num_images: int = 1, model: str = "",
+) -> str:
+    """POST /v1/ai/mystic -- returns the provider task id.
+
+    `model` is opt-in and forwarded ONLY when non-empty. Mystic's documented
+    behaviour for the field being absent entirely is "use the default model"
+    (docs.magnific.com/api-reference/mystic/post-mystic) -- that is exactly
+    v1's only behaviour, so omitting the key (not sending `model: ""`) keeps
+    every existing caller byte-for-byte unchanged.
+    """
+    body: dict = {"prompt": prompt, "num_images": num_images}
+    if model:
+        body["model"] = model
     resp = await ctx.http.post(
         f"{BASE_URL}{CREATE_PATH}",
         headers=_headers(api_key),
-        json={"prompt": prompt, "num_images": num_images},
+        json=body,
         timeout=60,
     )
     if resp.status_code == 401:
@@ -131,6 +143,7 @@ async def generate_image(
     api_key: str,
     prompt: str,
     *,
+    model: str = "",
     poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
     max_polls: int = DEFAULT_MAX_POLLS,
     on_progress=None,
@@ -142,7 +155,7 @@ async def generate_image(
     progress API directly (keeps the provider client focused on Magnific,
     not on chat/task plumbing).
     """
-    task_id = await create_mystic_job(ctx, api_key, prompt)
+    task_id = await create_mystic_job(ctx, api_key, prompt, model=model)
     for attempt in range(1, max_polls + 1):
         if on_progress:
             await on_progress(attempt, max_polls)

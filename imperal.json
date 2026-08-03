@@ -55,6 +55,12 @@
             "minimum": 0,
             "title": "Inline Count",
             "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "description": "Optional Magnific Mystic model for every asset in this brief: 'realism', 'fluid', 'zen', 'flexible', 'super_real', or 'editorial_portraits'. Omit to use Mystic's own default model (unchanged v1 behaviour).",
+            "title": "Model",
+            "type": "string"
           }
         },
         "title": "CreateMediaBriefParams",
@@ -139,6 +145,11 @@
               "provider_task_id": {
                 "default": "",
                 "title": "Provider Task Id",
+                "type": "string"
+              },
+              "model": {
+                "default": "",
+                "title": "Model",
                 "type": "string"
               },
               "image_url": {
@@ -263,6 +274,11 @@
             "default": 0,
             "title": "Inline Count",
             "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
           },
           "assets": {
             "items": {
@@ -398,6 +414,11 @@
                 "title": "Provider Task Id",
                 "type": "string"
               },
+              "model": {
+                "default": "",
+                "title": "Model",
+                "type": "string"
+              },
               "image_url": {
                 "default": "",
                 "title": "Image Url",
@@ -520,6 +541,11 @@
             "default": 0,
             "title": "Inline Count",
             "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
           },
           "assets": {
             "items": {
@@ -666,6 +692,11 @@
                 "title": "Provider Task Id",
                 "type": "string"
               },
+              "model": {
+                "default": "",
+                "title": "Model",
+                "type": "string"
+              },
               "image_url": {
                 "default": "",
                 "title": "Image Url",
@@ -788,6 +819,11 @@
             "default": 0,
             "title": "Inline Count",
             "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
           },
           "assets": {
             "items": {
@@ -921,6 +957,11 @@
                 "title": "Provider Task Id",
                 "type": "string"
               },
+              "model": {
+                "default": "",
+                "title": "Model",
+                "type": "string"
+              },
               "image_url": {
                 "default": "",
                 "title": "Image Url",
@@ -1044,6 +1085,11 @@
             "title": "Inline Count",
             "type": "integer"
           },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
           "assets": {
             "items": {
               "$ref": "#/$defs/MediaAsset"
@@ -1103,6 +1149,12 @@
             "default": "",
             "description": "Optional replacement prompt for just this asset. Omit to reuse the brief's original prompt for this role.",
             "title": "Prompt Override",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "description": "Optional Magnific Mystic model override for just this asset: 'realism', 'fluid', 'zen', 'flexible', 'super_real', or 'editorial_portraits'. Omit to reuse the package's model (or Mystic's default).",
+            "title": "Model",
             "type": "string"
           }
         },
@@ -1186,6 +1238,11 @@
           "provider_task_id": {
             "default": "",
             "title": "Provider Task Id",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
             "type": "string"
           },
           "image_url": {
@@ -1344,6 +1401,11 @@
           "provider_task_id": {
             "default": "",
             "title": "Provider Task Id",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
             "type": "string"
           },
           "image_url": {

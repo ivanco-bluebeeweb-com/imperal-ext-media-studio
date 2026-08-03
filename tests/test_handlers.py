@@ -161,6 +161,88 @@ async def test_regenerate_asset_success(ctx_with_key, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_media_brief_invalid_model_rejected(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
+                                     model="not-a-real-model"),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_INVALID_MODEL
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_omitted_model_is_unchanged_default(ctx):
+    """Backward compatibility: no `model` passed behaves exactly like v1 --
+    every asset's model stays "" (Mystic's own default, never sent to the API)."""
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=1),
+    )
+    assert result.status == "success"
+    assert result.data.model == ""
+    assert all(a.model == "" for a in result.data.assets)
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_valid_model_is_stored_on_every_asset(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=1,
+                                     model="fluid"),
+    )
+    assert result.status == "success"
+    assert result.data.model == "fluid"
+    assert all(a.model == "fluid" for a in result.data.assets)
+
+
+@pytest.mark.asyncio
+async def test_generate_media_package_forwards_model_to_provider(ctx_with_key, monkeypatch):
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
+                                              model="super_real"),
+    )
+    seen_models = []
+
+    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
+        seen_models.append(kwargs.get("model"))
+        return "https://cdn.example/img.png"
+
+    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
+    await h.generate_media_package(
+        ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
+    )
+    assert seen_models == ["super_real"]
+
+
+@pytest.mark.asyncio
+async def test_regenerate_asset_invalid_model_override_rejected(ctx_with_key):
+    brief = await h.create_media_brief(ctx_with_key, CreateMediaBriefParams(article_title="T", inline_count=0))
+    result = await h.regenerate_asset(
+        ctx_with_key, RegenerateAssetParams(package_id=brief.data.id, role="featured",
+                                             model="nope"),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_INVALID_MODEL
+
+
+@pytest.mark.asyncio
+async def test_regenerate_asset_model_override_forwarded(ctx_with_key, monkeypatch):
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(article_title="T", inline_count=0, model="realism"),
+    )
+    seen_models = []
+
+    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
+        seen_models.append(kwargs.get("model"))
+        return "https://cdn.example/regen.png"
+
+    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
+    await h.regenerate_asset(
+        ctx_with_key, RegenerateAssetParams(package_id=brief.data.id, role="featured",
+                                             model="zen"),
+    )
+    assert seen_models == ["zen"]
+
+
+@pytest.mark.asyncio
 async def test_update_asset_meta_edits_alt_and_caption(ctx):
     brief = await h.create_media_brief(ctx, CreateMediaBriefParams(article_title="T", inline_count=0))
     result = await h.update_asset_meta(ctx, UpdateAssetMetaParams(

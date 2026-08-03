@@ -10,6 +10,18 @@ from __future__ import annotations
 
 from imperal_sdk import ActionResult
 
+# Magnific Mystic's documented `model` enum (docs.magnific.com/api-reference/
+# mystic/post-mystic). Omitting the field entirely uses Mystic's own default
+# -- that omission is exactly what v1 always did, so "" here must stay a
+# legal, unvalidated choice for backward compatibility; only a NON-EMPTY
+# value that isn't in this set is rejected.
+MYSTIC_MODELS = ("realism", "fluid", "zen", "flexible", "super_real",
+                  "editorial_portraits")
+
+
+def is_valid_model(model: str) -> bool:
+    return model == "" or model in MYSTIC_MODELS
+
 
 def error(message: str, code: str, retryable: bool = False) -> ActionResult:
     """Error result carrying a mandatory structured code (see codes.py)."""

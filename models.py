@@ -58,6 +58,11 @@ class CreateMediaBriefParams(BaseModel):
     inline_count: int = Field(
         2, ge=0, le=8, description="How many inline supporting images besides "
                                    "the featured image (0-8).")
+    model: str = Field(
+        "", description="Optional Magnific Mystic model for every asset in "
+                        "this brief: 'realism', 'fluid', 'zen', 'flexible', "
+                        "'super_real', or 'editorial_portraits'. Omit to use "
+                        "Mystic's own default model (unchanged v1 behaviour).")
 
 
 class GenerateMediaPackageParams(BaseModel):
@@ -87,6 +92,11 @@ class RegenerateAssetParams(BaseModel):
     prompt_override: str = Field(
         "", description="Optional replacement prompt for just this asset. "
                         "Omit to reuse the brief's original prompt for this role.")
+    model: str = Field(
+        "", description="Optional Magnific Mystic model override for just this "
+                        "asset: 'realism', 'fluid', 'zen', 'flexible', "
+                        "'super_real', or 'editorial_portraits'. Omit to reuse "
+                        "the package's model (or Mystic's default).")
 
 
 class UpdateAssetMetaParams(BaseModel):
@@ -112,6 +122,7 @@ class MediaAsset(sdl.Entity):
     status: str = ""            # "pending" | "generating" | "ready" | "failed"
     provider: str = ""          # "magnific" (first and, for now, only backend)
     provider_task_id: str = ""
+    model: str = ""              # Mystic model used, "" = provider default
     image_url: str = ""
     prompt: str = ""
     alt_text: str = ""
@@ -127,6 +138,7 @@ class MediaPackage(sdl.Entity):
     style_direction: str = ""
     status: str = ""            # "draft" | "generating" | "ready" | "failed"
     inline_count: int = 0
+    model: str = ""              # Mystic model for this brief, "" = provider default
     assets: list[MediaAsset] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""

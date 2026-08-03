@@ -35,7 +35,7 @@ from models import (
     RegenerateAssetParams,
     UpdateAssetMetaParams,
 )
-from shared import default_alt_text, error as _error, prompt_for_role, roles_for
+from shared import default_alt_text, error as _error, is_valid_model, prompt_for_role, roles_for
 
 
 def _asset_title(role: str) -> str:
@@ -49,6 +49,7 @@ def _package_to_entity(row: dict) -> MediaPackage:
             title=_asset_title(a.get("role", "")),
             role=a.get("role", ""),
             provider=a.get("provider", "magnific"),
+            model=a.get("model", ""),
             status=a.get("status", "pending"),
             image_url=a.get("image_url", ""),
             alt_text=a.get("alt_text", ""),
@@ -66,6 +67,7 @@ def _package_to_entity(row: dict) -> MediaPackage:
         summary=row.get("summary", ""),
         style_direction=row.get("style_direction", ""),
         status=row.get("status", "draft"),
+        model=row.get("model", ""),
         assets=assets,
         created_at=row.get("created_at", ""),
         updated_at=row.get("updated_at", ""),
@@ -90,6 +92,14 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             "Give at least an article title or a summary to base the "
             "images on.", c.MEDIA_EMPTY_BRIEF,
         )
+    model = params.model.strip()
+    if not is_valid_model(model):
+        return _error(
+            f"'{model}' isn't a Magnific Mystic model. Use one of: "
+            "realism, fluid, zen, flexible, super_real, editorial_portraits "
+            "-- or omit it to use Mystic's default.",
+            c.MEDIA_INVALID_MODEL,
+        )
 
     roles = roles_for(params.inline_count)
     assets = [
@@ -97,6 +107,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             "id": role,
             "role": role,
             "provider": "magnific",
+            "model": model,
             "status": "pending",
             "image_url": "",
             "alt_text": "",
@@ -115,6 +126,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
         "summary": params.summary,
         "style_direction": params.style_direction,
         "status": "draft",
+        "model": model,
         "assets": assets,
     })
     row["id"] = package_id
@@ -174,7 +186,9 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
                     (i / total) * 100,
                     f"Generating {asset.get('role', 'image')}...",
                 )
-                image_url = await mc.generate_image(ctx, api_key, asset["prompt"])
+                image_url = await mc.generate_image(
+                    ctx, api_key, asset["prompt"], model=asset.get("model", ""),
+                )
                 asset["image_url"] = image_url
                 asset["status"] = "ready"
                 asset["error"] = ""
@@ -290,12 +304,24 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
 
     if params.prompt_override.strip():
         target["prompt"] = params.prompt_override.strip()
+    override_model = params.model.strip()
+    if override_model and not is_valid_model(override_model):
+        return _error(
+            f"'{override_model}' isn't a Magnific Mystic model. Use one of: "
+            "realism, fluid, zen, flexible, super_real, editorial_portraits "
+            "-- or omit it to reuse the package's model.",
+            c.MEDIA_INVALID_MODEL,
+        )
+    if override_model:
+        target["model"] = override_model
     target["status"] = "generating"
     await st.update_package(ctx, params.package_id, {"assets": assets})
 
     async def work() -> ActionResult:
         try:
-            image_url = await mc.generate_image(ctx, api_key, target["prompt"])
+            image_url = await mc.generate_image(
+                ctx, api_key, target["prompt"], model=target.get("model", ""),
+            )
             target["image_url"] = image_url
             target["status"] = "ready"
             target["error"] = ""
@@ -315,6 +341,7 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
             title=_asset_title(refreshed.get("role", "")),
             role=refreshed.get("role", ""),
             provider=refreshed.get("provider", "magnific"),
+            model=refreshed.get("model", ""),
             status=refreshed.get("status", ""),
             image_url=refreshed.get("image_url", ""),
             alt_text=refreshed.get("alt_text", ""),
@@ -328,7 +355,8 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
     return ActionResult.success(
         MediaAsset(id=target.get("role", ""), title=_asset_title(target.get("role", "")),
                    role=target.get("role", ""),
-                   provider=target.get("provider", "magnific"), status="generating"),
+                   provider=target.get("provider", "magnific"), model=target.get("model", ""),
+                   status="generating"),
         f"Regenerating '{params.role}'. I'll message you when it's ready.",
     )
 

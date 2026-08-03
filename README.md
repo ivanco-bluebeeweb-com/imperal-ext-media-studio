@@ -44,7 +44,12 @@ declared secret, one more `_xxx_connection()` builder, and one more entry in
 1. **`create_media_brief`** — site, article title, summary, style direction,
    and how many inline images besides the featured one (0-8). Creates a
    `draft` package with one `pending` asset per role (`featured`, `inline_1`,
-   `inline_2`, ...) and a role-appropriate prompt already built.
+   `inline_2`, ...) and a role-appropriate prompt already built. Optional
+   **`model`** picks a Magnific Mystic model for every asset in the brief:
+   `realism`, `fluid`, `zen`, `flexible`, `super_real`, `editorial_portraits`
+   (docs.magnific.com/api-reference/mystic/post-mystic). Omit it (the
+   default) to use Mystic's own default model — this is v1's only behaviour
+   and stays unchanged for every existing caller that never sets it.
 2. **`generate_media_package`** — generates every pending asset for a
    package. Runs in the background (`ctx.background_task`): you get an
    immediate acknowledgement, then a follow-up message when it's done. A
@@ -52,7 +57,9 @@ declared secret, one more `_xxx_connection()` builder, and one more entry in
 3. **`get_media_package`** / **`list_media_packages`** — read one package in
    full, or list/filter by site and status.
 4. **`regenerate_asset`** — redo exactly one asset (e.g. just the featured
-   image), optionally with a prompt override, without touching the others.
+   image), optionally with a prompt override and/or a `model` override (same
+   Mystic model list as above, e.g. try `super_real` on just the featured
+   shot without touching the inline images), without touching the others.
 5. **`update_asset_meta`** — edit an asset's alt text or caption without
    regenerating the image.
 6. **`delete_media_package`** — permanently delete a package and its asset

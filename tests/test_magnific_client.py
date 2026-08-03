@@ -11,6 +11,14 @@ async def test_create_mystic_job_extracts_task_id(ctx):
 
 
 @pytest.mark.asyncio
+async def test_create_mystic_job_with_model_still_works(ctx):
+    """model is opt-in -- passing one must not change the call's success path."""
+    ctx.http.mock_post("/v1/ai/mystic", {"data": {"task_id": "abc123"}}, status=200)
+    task_id = await mc.create_mystic_job(ctx, "key", "a cat", model="fluid")
+    assert task_id == "abc123"
+
+
+@pytest.mark.asyncio
 async def test_create_mystic_job_401_raises_provider_error(ctx):
     ctx.http.mock_post("/v1/ai/mystic", {"error": "unauthorized"}, status=401)
     with pytest.raises(mc.ProviderError) as exc:

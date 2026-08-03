@@ -36,6 +36,11 @@ from imperal_sdk import ui
 from app import ext
 import storage as st
 from providers import list_provider_connections
+from shared import MYSTIC_MODELS
+
+_MODEL_OPTIONS = [{"value": "", "label": "Mystic default"}] + [
+    {"value": m, "label": m.replace("_", " ")} for m in MYSTIC_MODELS
+]
 
 _MAGNIFIC_SIGNUP_URL = "https://www.magnific.com/api"
 
@@ -291,6 +296,8 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
         body_children.append(ui.Text("Not generated yet.", variant="caption"))
 
     body_children.append(ui.Text(asset.get("prompt", ""), variant="caption"))
+    if asset.get("model"):
+        body_children.append(ui.Badge(label="Model", value=asset["model"], color="purple"))
 
     body_children.append(ui.Form(
         action="update_asset_meta",
@@ -304,12 +311,16 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
         ],
     ))
 
-    body_children.append(ui.Stack(children=[
-        ui.Button(
-            "Regenerate", icon="RefreshCw", variant="secondary", size="sm",
-            on_click=ui.Call("regenerate_asset", package_id=package_id, role=role),
-        ),
-    ], direction="h"))
+    body_children.append(ui.Form(
+        action="regenerate_asset",
+        submit_label="Regenerate",
+        defaults={"package_id": package_id, "role": role},
+        children=[
+            ui.Select(param_name="model", options=_MODEL_OPTIONS,
+                      value=asset.get("model", ""),
+                      placeholder="Model override (optional)"),
+        ],
+    ))
 
     return ui.Card(
         title=role,
@@ -345,6 +356,8 @@ def _editor_new(ctx, any_connected: bool) -> ui.UINode:
                      placeholder="Style direction (optional)"),
             ui.Slider(param_name="inline_count", min=0, max=8, value=2,
                       label="Inline images besides featured"),
+            ui.Select(param_name="model", options=_MODEL_OPTIONS, value="",
+                      placeholder="Model (optional -- Magnific's own default if unset)"),
         ],
     ))
     children.append(ui.Button("Cancel", variant="ghost",
@@ -359,10 +372,13 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
         return ui.Empty(message="This media package no longer exists.")
 
     assets = row.get("assets", [])
+    header_badges = [_status_badge(row.get("status", "draft"))]
+    if row.get("model"):
+        header_badges.append(ui.Badge(label="Model", value=row["model"], color="purple"))
     header = ui.Stack(children=[
         ui.Header(text=row.get("article_title") or "(untitled brief)",
                    level=3, subtitle=row.get("site", "")),
-        _status_badge(row.get("status", "draft")),
+        ui.Stack(children=header_badges, direction="h", gap=2),
     ], direction="h", justify="between")
 
     generate_disabled = row.get("status") == "generating" or not any_connected
