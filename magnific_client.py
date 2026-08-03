@@ -49,6 +49,25 @@ def _headers(api_key: str) -> dict:
     return {"x-magnific-api-key": api_key, "content-type": "application/json"}
 
 
+async def validate_api_key(ctx, api_key: str) -> None:
+    """Verify a key without generating anything or consuming image credits.
+
+    Magnific documents this authenticated discovery endpoint at
+    ``GET /v1/analytics/team-members``. A successful response proves that the
+    key reaches a Magnific team; no response data is persisted or shown.
+    """
+    resp = await ctx.http.get(
+        f"{BASE_URL}/v1/analytics/team-members",
+        headers=_headers(api_key),
+        timeout=30,
+    )
+    if not (200 <= resp.status_code < 300):
+        raise ProviderError(
+            f"Magnific rejected the API key (HTTP {resp.status_code}).",
+            "MEDIA_PROVIDER_KEY_INVALID",
+        )
+
+
 async def create_mystic_job(ctx, api_key: str, prompt: str, *, num_images: int = 1) -> str:
     """POST /v1/ai/mystic -- returns the provider task id."""
     resp = await ctx.http.post(

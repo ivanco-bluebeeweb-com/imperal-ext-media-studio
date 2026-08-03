@@ -9,16 +9,35 @@ second consumer app can plug in later without moving code.
 
 ## Connecting
 
-Media Studio needs a Magnific API key:
+Media Studio needs a Magnific API key. There are two ways to set it, and
+both write the same secret:
 
-1. Magnific dashboard → Organization Settings → API Keys → Create API key
-   (requires a Business or Enterprise Magnific plan).
-2. Open Media Studio's **Secrets** panel (platform-provided, `right` slot —
-   every extension gets one automatically for its declared secrets) and paste
-   the key into `magnific_api_key`.
+1. **In-app Connect screen (recommended)** — open the center panel; a
+   first-time user with no provider connected lands here automatically. It
+   explains where to get a key (magnific.com → user menu → Organization
+   Settings → API Keys → Create API key — requires a Business or Enterprise
+   plan) and a form to paste it. The key is **verified against Magnific
+   before it is saved** (`connect_magnific`): a bad paste is rejected
+   immediately with Magnific's own reason, instead of failing silently the
+   first time you try to generate an image. From here you can also manage
+   the connection (disconnect) — open it any time via the left sidebar's
+   "Manage providers" button, or the panel's `view="connect"` /
+   `view="providers"` screens.
+2. **Platform's generic Secrets panel** — still works. `magnific_api_key` is
+   declared `write_mode="both"`, so the platform's own Secrets screen (`right`
+   slot) can write it too, with no in-app validation.
 
 A second secret, `magnific_webhook_secret`, is declared but **not read by any
 handler yet** — see "Why polling, not webhooks" below.
+
+### Managing / adding providers later
+
+`providers.py` is the single seam for this: `list_provider_connections()`
+returns one `ProviderConnection` per known backend, and the Providers screen
+(`view="providers"`) renders whatever that list contains — today just
+Magnific. Adding a second provider (e.g. Gemini) means adding one more
+declared secret, one more `_xxx_connection()` builder, and one more entry in
+`_KNOWN_PROVIDERS` — no panel redesign, no new slot.
 
 ## Workflow
 
@@ -42,13 +61,20 @@ handler yet** — see "Why polling, not webhooks" below.
 
 ## Panels
 
-- **left** — package list (title, site, per-package generation progress,
-  status badge, delete).
-- **center, overlay** — brief form (new package) or full editor (asset grid
-  with image/loading/error per role, alt text + caption fields, regenerate
-  button).
-- **right** — the platform's own generic Secrets panel. Not custom-built:
-  duplicating it here would fight the platform's UI for the same slot.
+- **left (`packages_nav`)** — package list, PLUS a permanent "Providers"
+  status card at the top (connected / not connected) with a "Manage
+  providers" button. This exists specifically to make the connection state
+  and its entry point visible every time this panel renders, instead of
+  requiring the user to already know where to look.
+- **center, overlay (`studio`)** — ONE panel, four screens selected by a
+  `view` parameter: `connect` (paste + validate the Magnific key), `providers`
+  (status list, connect/disconnect, built to hold more than one provider),
+  `editor` (brief form for a new package, or the full asset-grid editor for
+  an existing one). A first-time user with no provider connected lands on
+  `connect` by default.
+- **right** — the platform's own generic Secrets panel. Still present
+  (declared secrets always get one), and still usable directly, but no
+  longer the only way in: `magnific_api_key` is `write_mode="both"`.
 
 ## Design notes
 

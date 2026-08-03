@@ -24,6 +24,24 @@ from imperal_sdk import sdl
 
 # --------------------------- parameters ---------------------------
 
+class NoParams(BaseModel):
+    """Explicit empty params model -- V17 disallows untyped handlers, so
+    even a tool with nothing to configure needs a typed (if empty) model."""
+    pass
+
+
+class ConnectMagnificParams(BaseModel):
+    api_key: str = Field(
+        "", description="Magnific API key to validate and save for this user."
+    )
+
+
+class ProviderConnection(sdl.Entity):
+    provider: str = "magnific"
+    connected: bool = False
+    detail: str = ""
+
+
 class CreateMediaBriefParams(BaseModel):
     site: str = Field(
         "", description="Which site this article is for, e.g. 'g4s.md'. "

@@ -50,7 +50,9 @@ ext.secret(
         "Enterprise Magnific plan."
     ),
     required=True,
-    write_mode="user",
+    # "both": the built-in Secrets screen remains available, while Media
+    # Studio's own Connect flow can validate a pasted key before saving it.
+    write_mode="both",
     max_bytes=200,
     rotation_hint_days=90,
 )(lambda: None)

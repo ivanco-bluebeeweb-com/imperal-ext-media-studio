@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.13",
+  "sdk_version": "5.9.12",
   "app_id": "media-studio",
   "version": "1.0.0",
   "name": "Media Studio",
@@ -1497,6 +1497,355 @@
       "long_running": false,
       "scopes": [],
       "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "list_providers",
+      "description": "List every image-generation provider Media Studio knows about, and whether each one is connected for this user.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Explicit empty params model -- V17 disallows untyped handlers, so\neven a tool with nothing to configure needs a typed (if empty) model.",
+        "properties": {},
+        "title": "NoParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "provider": {
+            "default": "magnific",
+            "title": "Provider",
+            "type": "string"
+          },
+          "connected": {
+            "default": false,
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ProviderConnection",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.list_providers",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "connect_magnific",
+      "description": "Connect Magnific by saving your API key, after checking it actually works. Get a key from magnific.com: User menu -> Organization Settings -> API Keys (requires a Business or Enterprise plan).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "media-studio.provider.connected"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "api_key": {
+            "default": "",
+            "description": "Magnific API key to validate and save for this user.",
+            "title": "Api Key",
+            "type": "string"
+          }
+        },
+        "title": "ConnectMagnificParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "provider": {
+            "default": "magnific",
+            "title": "Provider",
+            "type": "string"
+          },
+          "connected": {
+            "default": false,
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ProviderConnection",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.connect_magnific",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "disconnect_magnific",
+      "description": "Disconnect Magnific: deletes the saved API key. Existing media packages and their already-generated images are kept -- only new generation is blocked until you connect again.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "media-studio.provider.disconnected"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Explicit empty params model -- V17 disallows untyped handlers, so\neven a tool with nothing to configure needs a typed (if empty) model.",
+        "properties": {},
+        "title": "NoParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "provider": {
+            "default": "magnific",
+            "title": "Provider",
+            "type": "string"
+          },
+          "connected": {
+            "default": false,
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ProviderConnection",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.disconnect_magnific",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
     }
   ],
   "signals": [],
@@ -1513,7 +1862,7 @@
       "name": "magnific_api_key",
       "description": "Your Magnific API key -- Magnific dashboard -> Organization Settings -> API Keys -> Create API key. Requires a Business or Enterprise Magnific plan.",
       "required": true,
-      "write_mode": "user",
+      "write_mode": "both",
       "max_bytes": 200,
       "scope": "user",
       "rotation_hint_days": 90
@@ -1539,24 +1888,24 @@
       "center_overlay": false
     },
     {
-      "panel_id": "packages",
+      "panel_id": "packages_nav",
       "slot": "left",
-      "title": "Media Packages",
+      "title": "Media Studio",
       "tree": {},
       "icon": "",
-      "refresh": "on_event:media-studio.create_media_brief,media-studio.generate_media_package,media-studio.delete_media_package",
+      "refresh": "on_event:media-studio.create_media_brief,media-studio.generate_media_package,media-studio.delete_media_package,media-studio.connect_magnific,media-studio.disconnect_magnific",
       "center_overlay": false,
       "default_width": 300,
       "min_width": 220,
       "max_width": 420
     },
     {
-      "panel_id": "editor",
+      "panel_id": "studio",
       "slot": "center",
-      "title": "Media Package Editor",
+      "title": "Media Studio",
       "tree": {},
       "icon": "",
-      "refresh": "on_event:media-studio.generate_media_package,media-studio.regenerate_asset,media-studio.update_asset_meta",
+      "refresh": "manual",
       "center_overlay": true
     }
   ]
