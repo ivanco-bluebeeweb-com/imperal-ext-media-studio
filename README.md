@@ -1,15 +1,15 @@
-# Media Studio
+# Media Studio Hub
 
 Generates a featured image plus supporting inline images for an article,
 using [Magnific](https://magnific.com)'s Mystic text-to-image model as the
 first (and currently only) image provider. Built as a standalone,
 provider-agnostic media layer for the G4S/Climtec article pipeline — not
-folded into WP Site Connector or SEO Audit Engine, so a second provider or a
+folded into WordPress Hub or SEO Audit Engine, so a second provider or a
 second consumer app can plug in later without moving code.
 
 ## Connecting
 
-Media Studio needs a Magnific API key. There are two ways to set it, and
+Media Studio Hub needs a Magnific API key. There are two ways to set it, and
 both write the same secret:
 
 1. **In-app Connect screen (recommended)** — open the center panel; a
@@ -64,7 +64,7 @@ declared secret, one more `_xxx_connection()` builder, and one more entry in
    regenerating the image.
 6. **`delete_media_package`** — permanently delete a package and its asset
    records (does **not** delete anything already hosted on Magnific's own
-   servers — only the record inside Media Studio).
+   servers — only the record inside Media Studio Hub).
 
 ## Panels
 
