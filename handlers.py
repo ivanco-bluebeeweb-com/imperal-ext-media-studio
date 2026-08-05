@@ -1,18 +1,31 @@
 """Chat-function tools.
 
-WHY GENERATION RUNS IN THE BACKGROUND.
+WHY GENERATION *TRIES* TO RUN IN THE BACKGROUND.
 
 A package with N images means N sequential Mystic jobs (create + poll each
 one), and Mystic generation + polling can easily exceed the 30s default
-ctx.http timeout even for a single image, let alone several. Following the
-confirmed-working pattern in SEO Audit Engine's `audit_sites`: the tool
-returns an immediate acknowledgement, then `ctx.background_task(work())`
-runs the real work and the platform auto-delivers `work()`'s returned
+ctx.http timeout even for a single image, let alone several. So the tool
+first tries `ctx.background_task(work())`: return an immediate
+acknowledgement, and the platform auto-delivers `work()`'s returned
 ActionResult as a fresh chat message when it finishes.
 
 `background=True` on the decorator is ONLY advisory metadata (confirmed by
 reading imperal_sdk 5.9.12/13 source -- there is no automatic wrapping); the
 actual detachment is the explicit `ctx.background_task(...)` call below.
+
+WHY THERE IS A SYNCHRONOUS FALLBACK. `ctx.background_task` raises
+RuntimeError when the Context has no kernel-injected spawn hook -- and this
+was confirmed to happen not just from a bare dev/terminal session but also
+from a real published app invoked from a genuine panel button click. Rather
+than surface an unrecoverable error to the user every time that happens,
+follow the proven pattern from SEO Audit Engine's `audit_sites`: catch
+exactly (RuntimeError, AttributeError) -- the two documented/plausible
+spawn-hook-missing shapes -- and simply `await work()` synchronously instead.
+A 1-3 image package comfortably fits Mystic's per-image generation+poll time
+within the platform's request budget, so this is a legitimate execution path,
+not a hack. Any OTHER exception type must keep propagating/roll back as
+before -- it means something inside work() itself broke, which is a real bug
+and must not be mistaken for "background jobs aren't available".
 """
 
 from __future__ import annotations
@@ -253,23 +266,16 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
             f"({final_status}).",
         )
 
+    coro = work()
     try:
-        await ctx.background_task(work(), long_running=True, name="media-studio-generate")
-    except Exception as exc:
-        # If the background worker can't even be spawned (e.g. this session
-        # has no kernel-injected spawn hook), the package must NOT be left
-        # stuck on "generating" forever -- roll the status back to "draft"
-        # so generate_media_package can be retried instead of permanently
-        # refusing with MEDIA_ALREADY_GENERATING.
-        await st.update_package(ctx, params.package_id, {"status": "draft"})
-        await ctx.log(f"generate_media_package: background_task spawn failed: {exc}", level="error")
-        return _error(
-            "Couldn't start image generation in this session (background "
-            "jobs aren't available here). The package is back to 'draft' -- "
-            "try again from the Imperal panel.",
-            c.MEDIA_BACKGROUND_UNAVAILABLE,
-            retryable=True,
-        )
+        await ctx.background_task(coro, long_running=True, name="media-studio-generate")
+    except (RuntimeError, AttributeError) as exc:
+        # No kernel spawn hook available in this context (dev/terminal
+        # session, or a panel dispatch path that doesn't wire one up).
+        # Same discipline as SEO Audit Engine's audit_sites: run the same
+        # coroutine synchronously instead of failing the whole request.
+        await ctx.log(f"generate_media_package: no background spawn hook ({exc}); running synchronously", level="warning")
+        return await coro
 
     return ActionResult.success(
         _package_to_entity({**row, "status": "generating"}),
@@ -409,22 +415,14 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
         )
         return ActionResult.success(asset_entity, f"'{params.role}' regenerated successfully.")
 
+    coro = work()
     try:
-        await ctx.background_task(work(), long_running=True, name="media-studio-regenerate")
-    except Exception as exc:
-        # Same rollback discipline as generate_media_package: don't leave
-        # this one asset stuck on "generating" forever if the background
-        # worker itself couldn't be spawned.
-        target["status"] = "failed"
-        target["error"] = "Background jobs aren't available in this session."
-        await st.update_package(ctx, params.package_id, {"assets": assets})
-        await ctx.log(f"regenerate_asset: background_task spawn failed: {exc}", level="error")
-        return _error(
-            "Couldn't start image generation in this session (background "
-            "jobs aren't available here). Try again from the Imperal panel.",
-            c.MEDIA_BACKGROUND_UNAVAILABLE,
-            retryable=True,
-        )
+        await ctx.background_task(coro, long_running=True, name="media-studio-regenerate")
+    except (RuntimeError, AttributeError) as exc:
+        # Same fallback discipline as generate_media_package: no kernel
+        # spawn hook here, so just run the same coroutine synchronously.
+        await ctx.log(f"regenerate_asset: no background spawn hook ({exc}); running synchronously", level="warning")
+        return await coro
 
     return ActionResult.success(
         MediaAsset(id=target.get("role", ""), title=_asset_title(target.get("role", "")),

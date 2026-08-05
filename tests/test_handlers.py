@@ -105,18 +105,23 @@ async def test_generate_media_package_already_generating(ctx_with_key):
 
 
 @pytest.mark.asyncio
-async def test_generate_media_package_rolls_back_when_spawn_fails(ctx_with_key, monkeypatch):
-    """If ctx.background_task itself can't spawn (e.g. no kernel spawn hook,
-    the exact failure seen running this extension from a terminal coding
-    session), the package must NOT be left stuck on 'generating' forever --
-    it has to roll back to 'draft' so generate_media_package can be retried.
+async def test_generate_media_package_runs_synchronously_when_spawn_fails(ctx_with_key, monkeypatch):
+    """If ctx.background_task itself can't spawn (no kernel spawn hook --
+    seen both from a terminal coding session AND from a real panel button
+    click on a published app), generation must NOT be aborted with a
+    'try again from the panel' error the user can't act on. Instead the same
+    work() coroutine runs synchronously in this same call and the images are
+    actually produced -- mirroring SEO Audit Engine's audit_sites fallback.
     """
     brief = await h.create_media_brief(
         ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0),
     )
 
+    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
+        return "https://cdn.example/img.png"
+    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
+
     async def broken_background_task(coro, *, long_running=False, name=""):
-        coro.close()  # avoid "never awaited" warning
         raise RuntimeError(
             "ctx.background_task not available in this context — the "
             "Context was constructed without a kernel-injected spawn hook."
@@ -127,39 +132,49 @@ async def test_generate_media_package_rolls_back_when_spawn_fails(ctx_with_key, 
     result = await h.generate_media_package(
         ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
     )
-    assert result.status == "error"
-    assert result.error_code == c.MEDIA_BACKGROUND_UNAVAILABLE
-    assert result.retryable is True
+    assert result.status == "success"
+    assert result.data.status == "ready"
+    assert result.data.assets[0].image_url == "https://cdn.example/img.png"
 
     import storage as st
     row = await st.get_package(ctx_with_key, brief.data.id)
-    assert row["status"] == "draft"
-
-    # And a retry (with a working spawn hook) must be allowed, not blocked
-    # by a stale "already generating" state.
-    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
-        return "https://cdn.example/img.png"
-    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
-
-    async def working_background_task(coro, *, long_running=False, name=""):
-        ctx_with_key.last_background_result = await coro
-        return "task-retry-1"
-    ctx_with_key.background_task = working_background_task
-
-    retry = await h.generate_media_package(
-        ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
-    )
-    assert retry.status == "success"
+    assert row["status"] == "ready"
 
 
 @pytest.mark.asyncio
-async def test_regenerate_asset_rolls_back_when_spawn_fails(ctx_with_key):
+async def test_generate_media_package_propagates_other_spawn_errors(ctx_with_key):
+    """Only RuntimeError/AttributeError from background_task itself mean
+    \"no spawn hook\" -- any other exception type must NOT be silently
+    swallowed into a synchronous fallback, since that could mask a real bug
+    in the spawn plumbing.
+    """
     brief = await h.create_media_brief(
         ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0),
     )
 
-    async def broken_background_task(coro, *, long_running=False, name=""):
+    async def weird_background_task(coro, *, long_running=False, name=""):
         coro.close()
+        raise ValueError("something unrelated broke")
+
+    ctx_with_key.background_task = weird_background_task
+
+    with pytest.raises(ValueError):
+        await h.generate_media_package(
+            ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
+        )
+
+
+@pytest.mark.asyncio
+async def test_regenerate_asset_runs_synchronously_when_spawn_fails(ctx_with_key, monkeypatch):
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0),
+    )
+
+    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
+        return "https://cdn.example/img2.png"
+    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
+
+    async def broken_background_task(coro, *, long_running=False, name=""):
         raise RuntimeError("ctx.background_task not available in this context")
 
     ctx_with_key.background_task = broken_background_task
@@ -167,13 +182,14 @@ async def test_regenerate_asset_rolls_back_when_spawn_fails(ctx_with_key):
     result = await h.regenerate_asset(
         ctx_with_key, RegenerateAssetParams(package_id=brief.data.id, role="featured"),
     )
-    assert result.status == "error"
-    assert result.error_code == c.MEDIA_BACKGROUND_UNAVAILABLE
+    assert result.status == "success"
+    assert result.data.status == "ready"
+    assert result.data.image_url == "https://cdn.example/img2.png"
 
     import storage as st
     row = await st.get_package(ctx_with_key, brief.data.id)
     featured = next(a for a in row["assets"] if a["role"] == "featured")
-    assert featured["status"] == "failed"  # not stuck on "generating"
+    assert featured["status"] == "ready"
 
 
 @pytest.mark.asyncio
