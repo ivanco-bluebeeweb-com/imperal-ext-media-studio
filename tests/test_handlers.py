@@ -201,6 +201,33 @@ async def test_generate_media_package_success_end_to_end(ctx_with_key, monkeypat
 
 
 @pytest.mark.asyncio
+async def test_generate_media_package_uses_native_title_and_lang_for_alt_text(ctx_with_key, monkeypatch):
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(
+            article_title="How to choose a ventilation system", summary="S", inline_count=1,
+            lang="ru", native_title="Как выбрать систему вентиляции",
+        ),
+    )
+    assert brief.data.lang == "ru"
+    assert brief.data.native_title == "Как выбрать систему вентиляции"
+
+    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
+        assert "Как выбрать" not in prompt  # image PROMPT stays English regardless of lang
+        return "https://cdn.example/img.png"
+
+    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
+
+    await h.generate_media_package(
+        ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
+    )
+    final = ctx_with_key.last_background_result
+    assert final.status == "success"
+    featured = next(a for a in final.data.assets if a.role == "featured")
+    assert "Как выбрать систему вентиляции" in featured.alt_text
+    assert featured.caption and "Как выбрать систему вентиляции" in featured.caption
+
+
+@pytest.mark.asyncio
 async def test_generate_media_package_all_failed_reports_error(ctx_with_key, monkeypatch):
     brief = await h.create_media_brief(
         ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0),

@@ -63,6 +63,20 @@ class CreateMediaBriefParams(BaseModel):
                         "this brief: 'realism', 'fluid', 'zen', 'flexible', "
                         "'super_real', or 'editorial_portraits'. Omit to use "
                         "Mystic's own default model (unchanged v1 behaviour).")
+    lang: str = Field(
+        "", description="The POST's own language code, e.g. 'ru', 'ro', 'en' -- "
+                        "used for alt text/caption wording, which must match the "
+                        "article's language (unlike the image PROMPT, which is "
+                        "always generated in English regardless of this field).")
+    native_title: str = Field(
+        "", description="The article title written in the post's OWN language "
+                        "(lang) -- used ONLY to build default alt text/caption. "
+                        "Keep 'article_title' itself in English (it feeds the "
+                        "image prompt, which must stay English); pass the real, "
+                        "native-language title here so alt text/caption come out "
+                        "correct for the post instead of defaulting to English. "
+                        "Omit to fall back to article_title (English default, "
+                        "same as v1 behaviour).")
 
 
 class GenerateMediaPackageParams(BaseModel):
@@ -139,6 +153,8 @@ class MediaPackage(sdl.Entity):
     status: str = ""            # "draft" | "generating" | "ready" | "failed"
     inline_count: int = 0
     model: str = ""              # Mystic model for this brief, "" = provider default
+    lang: str = ""                # post's own language, e.g. 'ru'/'ro' -- alt/caption wording
+    native_title: str = ""        # article title in lang, used for alt/caption only
     assets: list[MediaAsset] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""

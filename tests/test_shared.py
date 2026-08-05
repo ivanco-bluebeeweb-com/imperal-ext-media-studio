@@ -38,6 +38,39 @@ def test_default_alt_text_featured_vs_inline():
     assert featured != inline
 
 
+def test_default_alt_text_defaults_to_english_when_lang_omitted():
+    text = shared.default_alt_text("featured", "My Article")
+    assert text == "Featured image for: My Article"
+
+
+def test_default_alt_text_russian():
+    featured = shared.default_alt_text("featured", "Как выбрать вентиляцию", "ru")
+    inline = shared.default_alt_text("inline_1", "Как выбрать вентиляцию", "ru")
+    assert "Как выбрать вентиляцию" in featured
+    assert "Главное изображение" in featured
+    assert "Иллюстрация" in inline
+    assert featured != inline
+
+
+def test_default_alt_text_romanian():
+    featured = shared.default_alt_text("featured", "Cum alegi ventilația", "ro")
+    inline = shared.default_alt_text("inline_2", "Cum alegi ventilația", "ro")
+    assert "Cum alegi ventilația" in featured
+    assert "Imagine principală" in featured
+    assert "Imagine ilustrativă" in inline
+
+
+def test_default_alt_text_unknown_lang_falls_back_to_english():
+    text = shared.default_alt_text("featured", "My Article", "de")
+    assert text == "Featured image for: My Article"
+
+
+def test_default_alt_text_blank_title_uses_lang_specific_placeholder():
+    assert shared.default_alt_text("featured", "", "ru") == "Главное изображение к статье: статья"
+    assert shared.default_alt_text("featured", "", "ro") == "Imagine principală pentru articolul: articol"
+    assert shared.default_alt_text("featured", "") == "Featured image for: article"
+
+
 def test_error_carries_structured_code():
     result = shared.error("boom", "MEDIA_PROVIDER_ERROR")
     assert result.status == "error"

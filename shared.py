@@ -51,8 +51,26 @@ def prompt_for_role(role: str, article_title: str, summary: str, style_direction
     return f"{base}. {framing}{style}".strip()
 
 
-def default_alt_text(role: str, article_title: str) -> str:
-    title = article_title.strip() or "article"
+def default_alt_text(role: str, article_title: str, lang: str = "") -> str:
+    """Default alt text for one asset, phrased in the post's OWN language
+    when a supported lang code is given -- alt text is user-facing content on
+    the published page and must match the article's language, unlike the
+    (always-English) image generation prompt. Falls back to English for an
+    unrecognised/empty lang, same as v1 behaviour.
+    """
+    title = article_title.strip() or {
+        "ru": "статья", "ro": "articol",
+    }.get(lang, "article")
+    templates = {
+        "ru": {"featured": "Главное изображение к статье: {title}",
+               "inline": "Иллюстрация к статье: {title}"},
+        "ro": {"featured": "Imagine principală pentru articolul: {title}",
+               "inline": "Imagine ilustrativă pentru articolul: {title}"},
+    }
+    key = "featured" if role == "featured" else "inline"
+    lang_templates = templates.get(lang)
+    if lang_templates:
+        return lang_templates[key].format(title=title)
     if role == "featured":
         return f"Featured image for: {title}"
     return f"Supporting image for: {title}"

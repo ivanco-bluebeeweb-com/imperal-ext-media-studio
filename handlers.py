@@ -75,6 +75,8 @@ def _package_to_entity(row: dict) -> MediaPackage:
         style_direction=row.get("style_direction", ""),
         status=row.get("status", "draft"),
         model=row.get("model", ""),
+        lang=row.get("lang", ""),
+        native_title=row.get("native_title", ""),
         assets=assets,
         created_at=row.get("created_at", ""),
         updated_at=row.get("updated_at", ""),
@@ -147,6 +149,8 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
         "style_direction": params.style_direction,
         "status": "draft",
         "model": model,
+        "lang": params.lang.strip().lower(),
+        "native_title": params.native_title.strip(),
         "assets": assets,
     })
     row["id"] = package_id
@@ -213,8 +217,16 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
                 asset["status"] = "ready"
                 asset["error"] = ""
                 if not asset.get("alt_text"):
+                    lang = current.get("lang", "")
+                    display_title = current.get("native_title") or current.get("article_title", "")
                     asset["alt_text"] = default_alt_text(
-                        asset["role"], current.get("article_title", ""),
+                        asset["role"], display_title, lang,
+                    )
+                if not asset.get("caption"):
+                    lang = current.get("lang", "")
+                    display_title = current.get("native_title") or current.get("article_title", "")
+                    asset["caption"] = default_alt_text(
+                        asset["role"], display_title, lang,
                     )
             except mc.ProviderError as exc:
                 asset["status"] = "failed"
