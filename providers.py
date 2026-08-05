@@ -58,7 +58,7 @@ async def list_provider_connections(ctx) -> list[ProviderConnection]:
 
 @chat.function(
     "list_providers",
-    "List every image-generation provider Media Studio knows about, and "
+    "List every image-generation provider Media Hub knows about, and "
     "whether each one is connected for this user.",
     action_type="read",
     data_model=ProviderConnection,

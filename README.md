@@ -1,4 +1,4 @@
-# Media Studio Hub
+# Media Hub
 
 Generates a featured image plus supporting inline images for an article,
 using [Magnific](https://magnific.com)'s Mystic text-to-image model as the
@@ -9,7 +9,7 @@ second consumer app can plug in later without moving code.
 
 ## Connecting
 
-Media Studio Hub needs a Magnific API key. There are two ways to set it, and
+Media Hub needs a Magnific API key. There are two ways to set it, and
 both write the same secret:
 
 1. **In-app Connect screen (recommended)** — open the center panel; a
@@ -64,7 +64,7 @@ declared secret, one more `_xxx_connection()` builder, and one more entry in
    regenerating the image.
 6. **`delete_media_package`** — permanently delete a package and its asset
    records (does **not** delete anything already hosted on Magnific's own
-   servers — only the record inside Media Studio Hub).
+   servers — only the record inside Media Hub).
 
 ## Panels
 

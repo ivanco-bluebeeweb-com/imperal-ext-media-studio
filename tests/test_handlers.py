@@ -23,6 +23,42 @@ async def test_create_media_brief_empty_is_rejected(ctx):
 
 
 @pytest.mark.asyncio
+async def test_create_media_brief_rejects_russian_prompt(ctx):
+    """Article can be RU/RO -- but the image brief itself must be English,
+    since Magnific Mystic is documented and tuned for English prompts."""
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="climtec.md", article_title="Рекуператор тепла в Молдове",
+            summary="Как выбрать систему", inline_count=1,
+        ),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_PROMPT_NOT_ENGLISH
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_rejects_romanian_diacritics(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="climtec.md", article_title="Recuperator de căldură", inline_count=0,
+        ),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_PROMPT_NOT_ENGLISH
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_accepts_english(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="climtec.md", article_title="Heat recovery unit in Moldova",
+            summary="How to choose the right system", inline_count=1,
+        ),
+    )
+    assert result.status == "success"
+
+
+@pytest.mark.asyncio
 async def test_create_media_brief_builds_featured_plus_inline_assets(ctx):
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(
@@ -66,6 +102,78 @@ async def test_generate_media_package_already_generating(ctx_with_key):
     )
     assert result.status == "error"
     assert result.error_code == c.MEDIA_ALREADY_GENERATING
+
+
+@pytest.mark.asyncio
+async def test_generate_media_package_rolls_back_when_spawn_fails(ctx_with_key, monkeypatch):
+    """If ctx.background_task itself can't spawn (e.g. no kernel spawn hook,
+    the exact failure seen running this extension from a terminal coding
+    session), the package must NOT be left stuck on 'generating' forever --
+    it has to roll back to 'draft' so generate_media_package can be retried.
+    """
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0),
+    )
+
+    async def broken_background_task(coro, *, long_running=False, name=""):
+        coro.close()  # avoid "never awaited" warning
+        raise RuntimeError(
+            "ctx.background_task not available in this context — the "
+            "Context was constructed without a kernel-injected spawn hook."
+        )
+
+    ctx_with_key.background_task = broken_background_task
+
+    result = await h.generate_media_package(
+        ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_BACKGROUND_UNAVAILABLE
+    assert result.retryable is True
+
+    import storage as st
+    row = await st.get_package(ctx_with_key, brief.data.id)
+    assert row["status"] == "draft"
+
+    # And a retry (with a working spawn hook) must be allowed, not blocked
+    # by a stale "already generating" state.
+    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
+        return "https://cdn.example/img.png"
+    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
+
+    async def working_background_task(coro, *, long_running=False, name=""):
+        ctx_with_key.last_background_result = await coro
+        return "task-retry-1"
+    ctx_with_key.background_task = working_background_task
+
+    retry = await h.generate_media_package(
+        ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
+    )
+    assert retry.status == "success"
+
+
+@pytest.mark.asyncio
+async def test_regenerate_asset_rolls_back_when_spawn_fails(ctx_with_key):
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0),
+    )
+
+    async def broken_background_task(coro, *, long_running=False, name=""):
+        coro.close()
+        raise RuntimeError("ctx.background_task not available in this context")
+
+    ctx_with_key.background_task = broken_background_task
+
+    result = await h.regenerate_asset(
+        ctx_with_key, RegenerateAssetParams(package_id=brief.data.id, role="featured"),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_BACKGROUND_UNAVAILABLE
+
+    import storage as st
+    row = await st.get_package(ctx_with_key, brief.data.id)
+    featured = next(a for a in row["assets"] if a["role"] == "featured")
+    assert featured["status"] == "failed"  # not stuck on "generating"
 
 
 @pytest.mark.asyncio

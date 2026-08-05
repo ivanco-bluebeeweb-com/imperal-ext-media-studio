@@ -35,7 +35,14 @@ from models import (
     RegenerateAssetParams,
     UpdateAssetMetaParams,
 )
-from shared import default_alt_text, error as _error, is_valid_model, prompt_for_role, roles_for
+from shared import (
+    contains_non_english_text,
+    default_alt_text,
+    error as _error,
+    is_valid_model,
+    prompt_for_role,
+    roles_for,
+)
 
 
 def _asset_title(role: str) -> str:
@@ -99,6 +106,19 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             "realism, fluid, zen, flexible, super_real, editorial_portraits "
             "-- or omit it to use Mystic's default.",
             c.MEDIA_INVALID_MODEL,
+        )
+
+    non_english = contains_non_english_text(
+        params.article_title, params.summary, params.style_direction,
+    )
+    if non_english:
+        return _error(
+            "Image prompts must be written in English -- Magnific Mystic is "
+            f"tuned for English input. Found non-English text: '{non_english[:40]}'. "
+            "Translate article_title/summary/style_direction to English "
+            "before creating this brief (the article itself can stay in "
+            "any language -- only the image brief needs English).",
+            c.MEDIA_PROMPT_NOT_ENGLISH,
         )
 
     roles = roles_for(params.inline_count)
@@ -166,7 +186,7 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
     api_key = await ctx.secrets.get("magnific_api_key")
     if not api_key:
         return _error(
-            "No Magnific API key connected yet. Open Media Studio settings "
+            "No Magnific API key connected yet. Open Media Hub settings "
             "and paste your Magnific API key first.",
             c.MEDIA_KEY_NOT_CONFIGURED,
         )
@@ -221,7 +241,24 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
             f"({final_status}).",
         )
 
-    await ctx.background_task(work(), long_running=True, name="media-studio-generate")
+    try:
+        await ctx.background_task(work(), long_running=True, name="media-studio-generate")
+    except Exception as exc:
+        # If the background worker can't even be spawned (e.g. this session
+        # has no kernel-injected spawn hook), the package must NOT be left
+        # stuck on "generating" forever -- roll the status back to "draft"
+        # so generate_media_package can be retried instead of permanently
+        # refusing with MEDIA_ALREADY_GENERATING.
+        await st.update_package(ctx, params.package_id, {"status": "draft"})
+        await ctx.log(f"generate_media_package: background_task spawn failed: {exc}", level="error")
+        return _error(
+            "Couldn't start image generation in this session (background "
+            "jobs aren't available here). The package is back to 'draft' -- "
+            "try again from the Imperal panel.",
+            c.MEDIA_BACKGROUND_UNAVAILABLE,
+            retryable=True,
+        )
+
     return ActionResult.success(
         _package_to_entity({**row, "status": "generating"}),
         f"Started generating {len(row.get('assets', []))} image(s). "
@@ -297,12 +334,21 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
     api_key = await ctx.secrets.get("magnific_api_key")
     if not api_key:
         return _error(
-            "No Magnific API key connected yet. Open Media Studio settings "
+            "No Magnific API key connected yet. Open Media Hub settings "
             "and paste your Magnific API key first.",
             c.MEDIA_KEY_NOT_CONFIGURED,
         )
 
     if params.prompt_override.strip():
+        non_english = contains_non_english_text(params.prompt_override)
+        if non_english:
+            return _error(
+                "Image prompts must be written in English -- Magnific "
+                f"Mystic is tuned for English input. Found non-English "
+                f"text: '{non_english[:40]}'. Translate prompt_override to "
+                "English first.",
+                c.MEDIA_PROMPT_NOT_ENGLISH,
+            )
         target["prompt"] = params.prompt_override.strip()
     override_model = params.model.strip()
     if override_model and not is_valid_model(override_model):
@@ -351,7 +397,23 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
         )
         return ActionResult.success(asset_entity, f"'{params.role}' regenerated successfully.")
 
-    await ctx.background_task(work(), long_running=True, name="media-studio-regenerate")
+    try:
+        await ctx.background_task(work(), long_running=True, name="media-studio-regenerate")
+    except Exception as exc:
+        # Same rollback discipline as generate_media_package: don't leave
+        # this one asset stuck on "generating" forever if the background
+        # worker itself couldn't be spawned.
+        target["status"] = "failed"
+        target["error"] = "Background jobs aren't available in this session."
+        await st.update_package(ctx, params.package_id, {"assets": assets})
+        await ctx.log(f"regenerate_asset: background_task spawn failed: {exc}", level="error")
+        return _error(
+            "Couldn't start image generation in this session (background "
+            "jobs aren't available here). Try again from the Imperal panel.",
+            c.MEDIA_BACKGROUND_UNAVAILABLE,
+            retryable=True,
+        )
+
     return ActionResult.success(
         MediaAsset(id=target.get("role", ""), title=_asset_title(target.get("role", "")),
                    role=target.get("role", ""),
@@ -409,7 +471,7 @@ async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
     "delete_media_package",
     "Permanently delete a media package and all of its asset records. Does "
     "not delete images already hosted on Magnific's own servers -- only the "
-    "package record inside Media Studio.",
+    "package record inside Media Hub.",
     action_type="write",
     data_model=DeleteResult,
     event="media-studio.delete_media_package",

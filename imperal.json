@@ -3,7 +3,7 @@
   "sdk_version": "5.9.13",
   "app_id": "media-studio",
   "version": "1.0.0",
-  "name": "Media Studio",
+  "name": "Media Hub",
   "description": "Turn an article brief into a ready-to-publish image package -- featured image plus inline supporting images, with alt text -- using your own Magnific AI (Mystic) API key. Provider-agnostic media package model so other generators can plug in later.",
   "icon": "icon.svg",
   "actions_explicit": true,
@@ -1450,7 +1450,7 @@
     },
     {
       "name": "delete_media_package",
-      "description": "Permanently delete a media package and all of its asset records. Does not delete images already hosted on Magnific's own servers -- only the package record inside Media Studio.",
+      "description": "Permanently delete a media package and all of its asset records. Does not delete images already hosted on Magnific's own servers -- only the package record inside Media Hub.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -1562,7 +1562,7 @@
     },
     {
       "name": "list_providers",
-      "description": "List every image-generation provider Media Studio knows about, and whether each one is connected for this user.",
+      "description": "List every image-generation provider Media Hub knows about, and whether each one is connected for this user.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -1952,7 +1952,7 @@
     {
       "panel_id": "packages_nav",
       "slot": "left",
-      "title": "Media Studio",
+      "title": "Media Hub",
       "tree": {},
       "icon": "",
       "refresh": "on_event:media-studio.create_media_brief,media-studio.generate_media_package,media-studio.delete_media_package,media-studio.connect_magnific,media-studio.disconnect_magnific",
@@ -1964,7 +1964,7 @@
     {
       "panel_id": "studio",
       "slot": "center",
-      "title": "Media Studio",
+      "title": "Media Hub",
       "tree": {},
       "icon": "",
       "refresh": "manual",

@@ -56,3 +56,24 @@ def default_alt_text(role: str, article_title: str) -> str:
     if role == "featured":
         return f"Featured image for: {title}"
     return f"Supporting image for: {title}"
+
+
+# Characters that mark a string as clearly NOT English: Cyrillic (Russian,
+# etc.) and the Romanian-specific diacritics (ă â î ș ț). Image models like
+# Magnific Mystic are documented and tuned for English prompts -- an article
+# written in RU/RO must still get an English image prompt, so this is a hard
+# gate at brief-creation time rather than a convention callers might forget.
+def contains_non_english_text(*texts: str) -> str:
+    """Return the offending snippet if any text has Cyrillic or Romanian
+    diacritics, else "" (English/Latin-basic text is fine).
+    """
+    romanian_diacritics = set("ăâîșțĂÂÎȘȚ")
+    for text in texts:
+        if not text:
+            continue
+        for ch in text:
+            if "\u0400" <= ch <= "\u04FF":  # Cyrillic range
+                return text
+            if ch in romanian_diacritics:
+                return text
+    return ""

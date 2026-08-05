@@ -70,7 +70,7 @@ def _asset_progress(assets: list[dict]) -> str:
 @ext.panel(
     "packages_nav",
     slot="left",
-    title="Media Studio",
+    title="Media Hub",
     default_width=300,
     min_width=220,
     max_width=420,
@@ -233,7 +233,7 @@ def _connect_view(connections: list) -> ui.UINode:
 def _providers_view(connections: list) -> ui.UINode:
     children: list[ui.UINode] = [
         ui.Header(text="Providers", level=2,
-                   subtitle="Image-generation backends Media Studio can use"),
+                   subtitle="Image-generation backends Media Hub can use"),
     ]
 
     items = []
@@ -416,7 +416,7 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
 @ext.panel(
     "studio",
     slot="center",
-    title="Media Studio",
+    title="Media Hub",
     center_overlay=True,
     refresh="manual",
 )
