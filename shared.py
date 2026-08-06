@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from imperal_sdk import ActionResult
 
+import model_registry as mr
+
 # Magnific Mystic's documented `model` enum (docs.magnific.com/api-reference/
 # mystic/post-mystic). Omitting the field entirely uses Mystic's own default
 # -- that omission is exactly what v1 always did, so "" here must stay a
@@ -20,7 +22,30 @@ MYSTIC_MODELS = ("realism", "fluid", "zen", "flexible", "super_real",
 
 
 def is_valid_model(model: str) -> bool:
+    """Legacy check: empty (Mystic default) or one of Mystic's own 6 sub-
+    styles. Kept exactly as-is for backward compatibility -- see
+    `is_valid_model_choice` for the wider check that also accepts \"auto\"
+    and other registered providers (Imagen 4, Gemini)."""
     return model == "" or model in MYSTIC_MODELS
+
+
+def is_valid_model_choice(model: str) -> bool:
+    """True for everything `model` is now allowed to be: empty (Mystic
+    default), a Mystic sub-style, \"auto\" (automatic model selection --
+    see model_registry.pick_model), or an id from the multi-provider
+    registry (mystic/imagen4-fast/imagen4-ultra/gemini-2.5-flash)."""
+    return is_valid_model(model) or model == "auto" or mr.is_known_model(model)
+
+
+def valid_model_choices_hint() -> str:
+    """Human-readable list of every legal `model` value, for error messages."""
+    mystic = ", ".join(MYSTIC_MODELS)
+    registry = ", ".join(m for m in mr.MODELS if m != "mystic")
+    return (
+        f"Mystic styles ({mystic}), a specific model ({registry}), "
+        f"'auto' to let Media Hub pick automatically, or omit it for "
+        f"Mystic's own default."
+    )
 
 
 def error(message: str, code: str, retryable: bool = False) -> ActionResult:

@@ -59,10 +59,15 @@ class CreateMediaBriefParams(BaseModel):
         2, ge=0, le=8, description="How many inline supporting images besides "
                                    "the featured image (0-8).")
     model: str = Field(
-        "", description="Optional Magnific Mystic model for every asset in "
-                        "this brief: 'realism', 'fluid', 'zen', 'flexible', "
-                        "'super_real', or 'editorial_portraits'. Omit to use "
-                        "Mystic's own default model (unchanged v1 behaviour).")
+        "", description="Which model to use for every asset in this brief. "
+                        "Options: a Mystic style ('realism', 'fluid', 'zen', "
+                        "'flexible', 'super_real', 'editorial_portraits'), a "
+                        "specific model ('mystic', 'imagen4-fast', "
+                        "'imagen4-ultra', 'gemini-2.5-flash'), or 'auto' to let "
+                        "Media Hub automatically pick the best model per image "
+                        "role and prompt -- same idea as Magnific's own web app "
+                        "'Auto' option. Omit entirely for Mystic's own default "
+                        "(unchanged v1 behaviour).")
     lang: str = Field(
         "", description="The POST's own language code, e.g. 'ru', 'ro', 'en' -- "
                         "used for alt text/caption wording, which must match the "
@@ -107,10 +112,10 @@ class RegenerateAssetParams(BaseModel):
         "", description="Optional replacement prompt for just this asset. "
                         "Omit to reuse the brief's original prompt for this role.")
     model: str = Field(
-        "", description="Optional Magnific Mystic model override for just this "
-                        "asset: 'realism', 'fluid', 'zen', 'flexible', "
-                        "'super_real', or 'editorial_portraits'. Omit to reuse "
-                        "the package's model (or Mystic's default).")
+        "", description="Optional model override for just this asset. Same "
+                        "vocabulary as create_media_brief's model field "
+                        "(Mystic style, a specific model id, or 'auto'). Omit "
+                        "to reuse the package's model (or Mystic's default).")
 
 
 class UpdateAssetMetaParams(BaseModel):

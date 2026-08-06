@@ -2,9 +2,9 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.13",
   "app_id": "media-studio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Media Hub",
-  "description": "Turn an article brief into a ready-to-publish image package -- featured image plus inline supporting images, with alt text -- using your own Magnific AI (Mystic) API key. Provider-agnostic media package model so other generators can plug in later.",
+  "description": "Turn an article brief into a ready-to-publish image package -- featured image plus inline supporting images, with alt text -- using your own Magnific API key. Supports multiple AI image models (Magnific Mystic, Google Imagen 4 Fast/Ultra, Google Gemini 2.5 Flash) plus an automatic 'auto' model picker that matches the model to the image's role and prompt.",
   "icon": "icon.svg",
   "actions_explicit": true,
   "system": false,
@@ -58,7 +58,7 @@
           },
           "model": {
             "default": "",
-            "description": "Optional Magnific Mystic model for every asset in this brief: 'realism', 'fluid', 'zen', 'flexible', 'super_real', or 'editorial_portraits'. Omit to use Mystic's own default model (unchanged v1 behaviour).",
+            "description": "Which model to use for every asset in this brief. Options: a Mystic style ('realism', 'fluid', 'zen', 'flexible', 'super_real', 'editorial_portraits'), a specific model ('mystic', 'imagen4-fast', 'imagen4-ultra', 'gemini-2.5-flash'), or 'auto' to let Media Hub automatically pick the best model per image role and prompt -- same idea as Magnific's own web app 'Auto' option. Omit entirely for Mystic's own default (unchanged v1 behaviour).",
             "title": "Model",
             "type": "string"
           }
@@ -1153,7 +1153,7 @@
           },
           "model": {
             "default": "",
-            "description": "Optional Magnific Mystic model override for just this asset: 'realism', 'fluid', 'zen', 'flexible', 'super_real', or 'editorial_portraits'. Omit to reuse the package's model (or Mystic's default).",
+            "description": "Optional model override for just this asset. Same vocabulary as create_media_brief's model field (Mystic style, a specific model id, or 'auto'). Omit to reuse the package's model (or Mystic's default).",
             "title": "Model",
             "type": "string"
           }

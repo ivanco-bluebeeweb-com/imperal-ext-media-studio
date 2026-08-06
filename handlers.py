@@ -34,6 +34,7 @@ from imperal_sdk import ActionResult, sdl
 
 import codes as c
 import magnific_client as mc
+import model_registry as mr
 import storage as st
 from app import chat, ext
 from models import (
@@ -53,13 +54,49 @@ from shared import (
     default_alt_text,
     error as _error,
     is_valid_model,
+    is_valid_model_choice,
     prompt_for_role,
     roles_for,
+    valid_model_choices_hint,
 )
 
 
 def _asset_title(role: str) -> str:
     return "Featured image" if role == "featured" else f"Inline image ({role})"
+
+
+def _resolve_asset_model(role: str, chosen: str, prompt: str, style_direction: str) -> str:
+    """Turn what the caller asked for into the CONCRETE model id stored on
+    the asset. \"auto\" is resolved HERE, once, at brief-creation time --
+    never re-resolved silently later -- so the stored value is always the
+    real, visible, overridable choice (mirrors model_registry's own
+    transparency goal: no hidden re-picking on every regenerate).
+
+    A Mystic sub-style (or \"\") is passed through unchanged -- those are
+    Mystic's OWN style knob, not a competing model id, so `mc.generate_image`
+    keeps handling them exactly as before.
+    """
+    if chosen == "auto":
+        return mr.pick_model(role, prompt, style_direction)
+    return chosen
+
+
+async def _generate_asset_image(ctx, api_key: str, asset: dict, *, on_progress=None) -> str:
+    """Route one asset's generation to the right client call based on its
+    stored `model`. Empty string or a Mystic sub-style (see shared.MYSTIC_MODELS)
+    -> the original Mystic-only path (byte-for-byte, so every existing test
+    and behaviour is unchanged). Any OTHER registered model id (imagen4-fast,
+    imagen4-ultra, gemini-2.5-flash) -> the new generic multi-provider path.
+    """
+    model = asset.get("model", "")
+    if is_valid_model(model):
+        return await mc.generate_image(
+            ctx, api_key, asset["prompt"], model=model, on_progress=on_progress,
+        )
+    spec = mr.get_model(model)
+    return await mc.generate_image_with_model(
+        ctx, api_key, asset["prompt"], spec, on_progress=on_progress,
+    )
 
 
 def _package_to_entity(row: dict) -> MediaPackage:
@@ -114,12 +151,11 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             "Give at least an article title or a summary to base the "
             "images on.", c.MEDIA_EMPTY_BRIEF,
         )
-    model = params.model.strip()
-    if not is_valid_model(model):
+    model_choice = params.model.strip()
+    if not is_valid_model_choice(model_choice):
         return _error(
-            f"'{model}' isn't a Magnific Mystic model. Use one of: "
-            "realism, fluid, zen, flexible, super_real, editorial_portraits "
-            "-- or omit it to use Mystic's default.",
+            f"'{model_choice}' isn't a model Media Hub knows. "
+            f"Use one of: {valid_model_choices_hint()}",
             c.MEDIA_INVALID_MODEL,
         )
 
@@ -137,23 +173,27 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
         )
 
     roles = roles_for(params.inline_count)
-    assets = [
-        {
+    assets = []
+    for role in roles:
+        prompt = prompt_for_role(
+            role, params.article_title, params.summary, params.style_direction,
+        )
+        resolved_model = _resolve_asset_model(
+            role, model_choice, prompt, params.style_direction,
+        )
+        provider = mr.get_model(resolved_model).provider if resolved_model in mr.MODELS else "magnific"
+        assets.append({
             "id": role,
             "role": role,
-            "provider": "magnific",
-            "model": model,
+            "provider": provider,
+            "model": resolved_model,
             "status": "pending",
             "image_url": "",
             "alt_text": "",
             "caption": "",
-            "prompt": prompt_for_role(
-                role, params.article_title, params.summary, params.style_direction,
-            ),
+            "prompt": prompt,
             "error": "",
-        }
-        for role in roles
-    ]
+        })
 
     package_id, row = await st.create_package(ctx, {
         "site": params.site,
@@ -161,7 +201,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
         "summary": params.summary,
         "style_direction": params.style_direction,
         "status": "draft",
-        "model": model,
+        "model": model_choice,
         "lang": params.lang.strip().lower(),
         "native_title": params.native_title.strip(),
         "assets": assets,
@@ -223,9 +263,7 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
                     (i / total) * 100,
                     f"Generating {asset.get('role', 'image')}...",
                 )
-                image_url = await mc.generate_image(
-                    ctx, api_key, asset["prompt"], model=asset.get("model", ""),
-                )
+                image_url = await _generate_asset_image(ctx, api_key, asset)
                 asset["image_url"] = image_url
                 asset["status"] = "ready"
                 asset["error"] = ""
@@ -369,23 +407,28 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
             )
         target["prompt"] = params.prompt_override.strip()
     override_model = params.model.strip()
-    if override_model and not is_valid_model(override_model):
+    if override_model and not is_valid_model_choice(override_model):
         return _error(
-            f"'{override_model}' isn't a Magnific Mystic model. Use one of: "
-            "realism, fluid, zen, flexible, super_real, editorial_portraits "
-            "-- or omit it to reuse the package's model.",
+            f"'{override_model}' isn't a model Media Hub knows. "
+            f"Use one of: {valid_model_choices_hint()}",
             c.MEDIA_INVALID_MODEL,
         )
     if override_model:
-        target["model"] = override_model
+        resolved_model = _resolve_asset_model(
+            params.role, override_model, target["prompt"],
+            row.get("style_direction", ""),
+        )
+        target["model"] = resolved_model
+        target["provider"] = (
+            mr.get_model(resolved_model).provider
+            if resolved_model in mr.MODELS else "magnific"
+        )
     target["status"] = "generating"
     await st.update_package(ctx, params.package_id, {"assets": assets})
 
     async def work() -> ActionResult:
         try:
-            image_url = await mc.generate_image(
-                ctx, api_key, target["prompt"], model=target.get("model", ""),
-            )
+            image_url = await _generate_asset_image(ctx, api_key, target)
             target["image_url"] = image_url
             target["status"] = "ready"
             target["error"] = ""

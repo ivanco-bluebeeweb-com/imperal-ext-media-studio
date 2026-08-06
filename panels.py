@@ -35,12 +35,17 @@ from imperal_sdk import ui
 
 from app import ext
 import storage as st
+import model_registry as mr
 from providers import list_provider_connections
 from shared import MYSTIC_MODELS
 
-_MODEL_OPTIONS = [{"value": "", "label": "Mystic default"}] + [
-    {"value": m, "label": m.replace("_", " ")} for m in MYSTIC_MODELS
-]
+_MODEL_OPTIONS = (
+    [{"value": "", "label": "Mystic default"},
+     {"value": "auto", "label": "Auto (Media Hub picks the best model)"}]
+    + [{"value": m, "label": m.replace("_", " ")} for m in MYSTIC_MODELS]
+    + [{"value": m_id, "label": spec.label} for m_id, spec in mr.MODELS.items()
+       if m_id != "mystic"]
+)
 
 _MAGNIFIC_SIGNUP_URL = "https://www.magnific.com/api"
 

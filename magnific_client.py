@@ -175,6 +175,112 @@ async def generate_image(
     )
 
 
+# --------------------------- generic multi-model path ---------------------------
+#
+# The functions above are Mystic-specific and stay exactly as they were --
+# every existing caller/test keeps working byte-for-byte. Everything below
+# is the NEW generic path used for any model registered in model_registry
+# (Imagen 4 Fast/Ultra, Gemini 2.5 Flash, and Mystic itself via the same
+# generic path once `spec` is passed). Same lifecycle vocabulary, same
+# `{"data": {...}}` unwrap convention -- confirmed identical across every
+# Magnific async task endpoint in their docs -- so `_extract_*` is reused
+# unchanged; only the request path/body differ per model.
+
+async def create_job(ctx, api_key: str, spec, prompt: str) -> str:
+    """POST to `spec.create_path` with `spec.build_body(prompt)`. Generic
+    counterpart to create_mystic_job -- works for any ModelSpec."""
+    resp = await ctx.http.post(
+        f"{BASE_URL}{spec.create_path}",
+        headers=_headers(api_key),
+        json=spec.build_body(prompt),
+        timeout=60,
+    )
+    if resp.status_code == 401:
+        raise ProviderError(
+            f"Magnific rejected the API key (401) for {spec.label}.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    if not (200 <= resp.status_code < 300):
+        raise ProviderError(
+            f"Magnific create-job call failed for {spec.label} "
+            f"(HTTP {resp.status_code}).",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    body = resp.json()
+    task_id = _extract_task_id(body)
+    if not task_id:
+        raise ProviderError(
+            f"Magnific accepted the {spec.label} job but returned no "
+            "recognizable task id.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    return task_id
+
+
+async def get_job(ctx, api_key: str, spec, task_id: str) -> dict:
+    """GET `spec.status_path` -- generic counterpart to get_mystic_task."""
+    resp = await ctx.http.get(
+        f"{BASE_URL}{spec.status_path.format(task_id=task_id)}",
+        headers=_headers(api_key),
+        timeout=30,
+    )
+    if not (200 <= resp.status_code < 300):
+        raise ProviderError(
+            f"Magnific status check failed for {spec.label} "
+            f"(HTTP {resp.status_code}).",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    body = resp.json()
+    status = _extract_status(body)
+    if status in DONE_STATUSES:
+        urls = _extract_image_urls(body)
+        if not urls:
+            raise ProviderError(
+                f"Magnific reported the {spec.label} job as done but "
+                "returned no image URLs.",
+                "MEDIA_PROVIDER_ERROR",
+            )
+        return {"state": "done", "image_urls": urls, "raw_status": status}
+    if status in FAILED_STATUSES:
+        return {"state": "failed", "image_urls": [], "raw_status": status}
+    return {"state": "pending", "image_urls": [], "raw_status": status or "unknown"}
+
+
+async def generate_image_with_model(
+    ctx,
+    api_key: str,
+    prompt: str,
+    spec,
+    *,
+    poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
+    max_polls: int = DEFAULT_MAX_POLLS,
+    on_progress=None,
+) -> str:
+    """Create + poll a job against ANY registered model (`spec` is a
+    model_registry.ModelSpec). This is the multi-provider counterpart to
+    `generate_image`, which stays Mystic-only for backward compatibility.
+    """
+    task_id = await create_job(ctx, api_key, spec, prompt)
+    for attempt in range(1, max_polls + 1):
+        if on_progress:
+            await on_progress(attempt, max_polls)
+        await asyncio.sleep(poll_interval_s)
+        result = await get_job(ctx, api_key, spec, task_id)
+        if result["state"] == "done":
+            return result["image_urls"][0]
+        if result["state"] == "failed":
+            raise ProviderError(
+                f"Magnific reported the {spec.label} generation job as "
+                f"failed (status={result['raw_status']}).",
+                "MEDIA_PROVIDER_ERROR",
+            )
+    raise ProviderError(
+        f"Magnific {spec.label} job did not finish within "
+        f"{max_polls * poll_interval_s:.0f}s.",
+        "MEDIA_PROVIDER_TIMEOUT",
+    )
+
+
 # --------------------------- response shape helpers ---------------------------
 
 def _unwrap(body: dict) -> dict:

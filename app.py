@@ -23,13 +23,15 @@ from imperal_sdk import Extension, ChatExtension
 
 ext = Extension(
     "media-studio",
-    version="1.0.0",
+    version="1.1.0",
     display_name="Media Hub",
     description=(
         "Turn an article brief into a ready-to-publish image package -- "
-        "featured image plus inline supporting images, with alt text -- "
-        "using your own Magnific AI (Mystic) API key. Provider-agnostic "
-        "media package model so other generators can plug in later."
+        "featured image plus inline supporting images, with alt text -- using "
+        "your own Magnific API key. Supports multiple AI image models "
+        "(Magnific Mystic, Google Imagen 4 Fast/Ultra, Google Gemini 2.5 "
+        "Flash) plus an automatic 'auto' model picker that matches the model "
+        "to the image's role and prompt."
     ),
     icon="icon.svg",
     actions_explicit=True,
