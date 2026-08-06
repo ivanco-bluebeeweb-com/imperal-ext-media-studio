@@ -66,17 +66,40 @@ class ModelSpec:
     tags: tuple[str, ...] = field(default_factory=tuple)  # heuristic hints
 
 
+# Every blogpost image this pipeline generates must be 4:3 landscape (the
+# user's explicit standing directive). `classic_4_3` is the exact enum value
+# confirmed on BOTH Mystic's and Imagen 4's documented request bodies
+# (docs.magnific.com/api-reference/mystic/post-mystic lists `aspect_ratio`
+# with a `square_1_1` default and the same enum set as Imagen4's
+# .../text-to-image/imagen4-fast/generate page -- both include `classic_4_3`
+# = "4:3, horizontal/landscape"). Kept as one constant here (mirrored in
+# shared.ASPECT_RATIO_4_3) so both body-builders below use the identical
+# value -- no per-model drift.
+ASPECT_RATIO_4_3 = "classic_4_3"
+
+
 def _mystic_body(prompt: str) -> dict:
-    return {"prompt": prompt, "num_images": 1}
+    # `aspect_ratio` confirmed on Mystic's own docs page (default square_1_1,
+    # same enum as Imagen4) -- omitted historically only because v1 never
+    # asked for anything but the square default; every blogpost image now
+    # must be 4:3 landscape, so it's set explicitly.
+    return {"prompt": prompt, "num_images": 1, "aspect_ratio": ASPECT_RATIO_4_3}
 
 
 def _imagen4_body(prompt: str) -> dict:
     # Confirmed fields: docs.magnific.com/api-reference/text-to-image/imagen4-fast/generate
-    return {"prompt": prompt, "aspect_ratio": "widescreen_16_9"}
+    # Was hardcoded to widescreen_16_9 -- corrected to the pipeline-wide 4:3
+    # landscape requirement.
+    return {"prompt": prompt, "aspect_ratio": ASPECT_RATIO_4_3}
 
 
 def _gemini_flash_body(prompt: str) -> dict:
     # Confirmed fields: docs.magnific.com/api-reference/text-to-image/post-gemini-2-5-flash-image-preview
+    # NOTE: Gemini 2.5 Flash has NO aspect_ratio field in Magnific's docs --
+    # confirmed by reading the actual field list, not inferred. Adding one
+    # here would be a fabricated/unsupported parameter, so this model is a
+    # documented EXCEPTION to the pipeline's 4:3 rule until Magnific adds
+    # that control for it.
     return {"prompt": prompt}
 
 

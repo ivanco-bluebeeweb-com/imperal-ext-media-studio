@@ -50,9 +50,11 @@ from models import (
     UpdateAssetMetaParams,
 )
 from shared import (
+    ASPECT_RATIO_4_3,
     contains_non_english_text,
     default_alt_text,
     error as _error,
+    is_image_url_expired,
     is_valid_model,
     is_valid_model_choice,
     prompt_for_role,
@@ -85,13 +87,20 @@ async def _generate_asset_image(ctx, api_key: str, asset: dict, *, on_progress=N
     """Route one asset's generation to the right client call based on its
     stored `model`. Empty string or a Mystic sub-style (see shared.MYSTIC_MODELS)
     -> the original Mystic-only path (byte-for-byte, so every existing test
-    and behaviour is unchanged). Any OTHER registered model id (imagen4-fast,
-    imagen4-ultra, gemini-2.5-flash) -> the new generic multi-provider path.
+    and behaviour is unchanged) -- now with the pipeline-wide 4:3 landscape
+    aspect ratio (shared.ASPECT_RATIO_4_3) forwarded on every call, since
+    every blogpost image must be 4:3 landscape (standing directive; Imagen4's
+    body builder in model_registry.py carries the same constant). Any OTHER
+    registered model id (imagen4-fast, imagen4-ultra, gemini-2.5-flash) ->
+    the new generic multi-provider path, whose body is built per-model in
+    model_registry.py (Gemini has no aspect_ratio field at all -- documented
+    exception, not an oversight).
     """
     model = asset.get("model", "")
     if is_valid_model(model):
         return await mc.generate_image(
-            ctx, api_key, asset["prompt"], model=model, on_progress=on_progress,
+            ctx, api_key, asset["prompt"], model=model,
+            aspect_ratio=ASPECT_RATIO_4_3, on_progress=on_progress,
         )
     spec = mr.get_model(model)
     return await mc.generate_image_with_model(
@@ -177,6 +186,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
     for role in roles:
         prompt = prompt_for_role(
             role, params.article_title, params.summary, params.style_direction,
+            params.lang.strip(),
         )
         resolved_model = _resolve_asset_model(
             role, model_choice, prompt, params.style_direction,
@@ -227,7 +237,21 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
     effects=["update:media_package"],
 )
 async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> ActionResult:
-    """Generate every pending asset in a package via Magnific, in the background."""
+    """Generate every pending asset in a package via Magnific, in the background.
+
+    WHY "ready" ALONE ISN'T ENOUGH TO SKIP AN ASSET. Confirmed live on a real
+    package: Magnific/Freepik's CDN image URL carries a signed token that
+    expires a few hours after generation, but `status` is written once and
+    never re-checked -- so an asset generated hours ago is still stored as
+    "ready" while its `image_url` is already a dead link ("Image
+    unavailable" in the panel). Before this fix the loop below skipped every
+    "ready" asset unconditionally, which is why "Generate all"/"Regenerate"
+    looked like they did nothing on an old package: everything was already
+    (stale-)"ready", so there was nothing left to (re)generate. Now a
+    "ready" asset is only skipped when its stored URL is NOT expired
+    (shared.is_image_url_expired) -- an expired one is regenerated exactly
+    like a pending/failed one.
+    """
     row = await st.get_package(ctx, params.package_id)
     if row is None:
         return _error(
@@ -256,7 +280,7 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
         total = len(assets) or 1
         any_failed = False
         for i, asset in enumerate(assets):
-            if asset.get("status") == "ready":
+            if asset.get("status") == "ready" and not is_image_url_expired(asset.get("image_url", "")):
                 continue
             try:
                 await ctx.progress(

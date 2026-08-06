@@ -34,6 +34,28 @@ def test_every_model_spec_builds_a_body_with_the_prompt():
         assert body["prompt"] == "a cat on a roof"
 
 
+# --------------------------- 4:3 landscape aspect ratio ---------------------------
+
+def test_mystic_body_requests_classic_4_3():
+    body = mr.MODELS["mystic"].build_body("a warehouse")
+    assert body["aspect_ratio"] == "classic_4_3"
+
+
+def test_imagen4_fast_body_requests_classic_4_3():
+    body = mr.MODELS["imagen4-fast"].build_body("a warehouse")
+    assert body["aspect_ratio"] == "classic_4_3"
+
+
+def test_imagen4_ultra_body_requests_classic_4_3():
+    body = mr.MODELS["imagen4-ultra"].build_body("a warehouse")
+    assert body["aspect_ratio"] == "classic_4_3"
+
+
+def test_gemini_body_has_no_aspect_ratio_field_documented_exception():
+    body = mr.MODELS["gemini-2.5-flash"].build_body("a warehouse")
+    assert "aspect_ratio" not in body
+
+
 # --------------------------- pick_model (auto) ---------------------------
 
 def test_pick_model_illustrative_cue_prefers_mystic():

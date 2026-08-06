@@ -30,6 +30,26 @@ def test_prompt_for_role_falls_back_to_title_when_no_summary():
     assert "My Title" in prompt
 
 
+def test_prompt_for_role_no_lang_has_no_language_clause():
+    prompt = shared.prompt_for_role("featured", "Title", "Summary", "")
+    assert "language" not in prompt.lower()
+
+
+def test_prompt_for_role_russian_adds_language_clause_for_any_embedded_text():
+    prompt = shared.prompt_for_role("featured", "Title", "Summary", "", "ru")
+    assert "Russian" in prompt
+
+
+def test_prompt_for_role_romanian_adds_language_clause_for_any_embedded_text():
+    prompt = shared.prompt_for_role("inline_1", "Title", "Summary", "", "ro")
+    assert "Romanian" in prompt
+
+
+def test_prompt_for_role_unknown_lang_adds_no_clause():
+    prompt = shared.prompt_for_role("featured", "Title", "Summary", "", "de")
+    assert "language" not in prompt.lower()
+
+
 def test_default_alt_text_featured_vs_inline():
     featured = shared.default_alt_text("featured", "My Article")
     inline = shared.default_alt_text("inline_1", "My Article")
@@ -76,3 +96,34 @@ def test_error_carries_structured_code():
     assert result.status == "error"
     assert result.error == "boom"
     assert result.error_code == "MEDIA_PROVIDER_ERROR"
+
+
+# --------------------------- is_image_url_expired ---------------------------
+
+def test_is_image_url_expired_empty_url_is_not_expired():
+    assert not shared.is_image_url_expired("")
+
+
+def test_is_image_url_expired_url_without_token_is_not_expired():
+    assert not shared.is_image_url_expired("https://cdn.example/img.png")
+
+
+def test_is_image_url_expired_past_exp_is_expired():
+    url = "https://cdn.freepik.com/img.png?token=exp=1000~hmac=abc&size=stable"
+    assert shared.is_image_url_expired(url, now=2000)
+
+
+def test_is_image_url_expired_future_exp_is_not_expired():
+    url = "https://cdn.freepik.com/img.png?token=exp=5000~hmac=abc&size=stable"
+    assert not shared.is_image_url_expired(url, now=2000)
+
+
+def test_is_image_url_expired_exactly_at_deadline_is_expired():
+    url = "https://cdn.freepik.com/img.png?token=exp=2000~hmac=abc&size=stable"
+    assert shared.is_image_url_expired(url, now=2000)
+
+
+# --------------------------- ASPECT_RATIO_4_3 ---------------------------
+
+def test_aspect_ratio_4_3_is_the_documented_classic_4_3_enum_value():
+    assert shared.ASPECT_RATIO_4_3 == "classic_4_3"

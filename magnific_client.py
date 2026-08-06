@@ -76,6 +76,7 @@ async def validate_api_key(ctx, api_key: str) -> None:
 
 async def create_mystic_job(
     ctx, api_key: str, prompt: str, *, num_images: int = 1, model: str = "",
+    aspect_ratio: str = "",
 ) -> str:
     """POST /v1/ai/mystic -- returns the provider task id.
 
@@ -84,10 +85,19 @@ async def create_mystic_job(
     (docs.magnific.com/api-reference/mystic/post-mystic) -- that is exactly
     v1's only behaviour, so omitting the key (not sending `model: ""`) keeps
     every existing caller byte-for-byte unchanged.
+
+    `aspect_ratio` is likewise opt-in and forwarded ONLY when non-empty --
+    confirmed as a real Mystic field (default `square_1_1`) on the same docs
+    page. Callers that don't pass it keep getting Mystic's own default,
+    exactly like v1; the pipeline's blogpost callers now pass
+    shared.ASPECT_RATIO_4_3 explicitly (see shared.prompt_for_role's sibling
+    constant) to satisfy the 4:3 landscape standing requirement.
     """
     body: dict = {"prompt": prompt, "num_images": num_images}
     if model:
         body["model"] = model
+    if aspect_ratio:
+        body["aspect_ratio"] = aspect_ratio
     resp = await ctx.http.post(
         f"{BASE_URL}{CREATE_PATH}",
         headers=_headers(api_key),
@@ -144,6 +154,7 @@ async def generate_image(
     prompt: str,
     *,
     model: str = "",
+    aspect_ratio: str = "",
     poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
     max_polls: int = DEFAULT_MAX_POLLS,
     on_progress=None,
@@ -155,7 +166,9 @@ async def generate_image(
     progress API directly (keeps the provider client focused on Magnific,
     not on chat/task plumbing).
     """
-    task_id = await create_mystic_job(ctx, api_key, prompt, model=model)
+    task_id = await create_mystic_job(
+        ctx, api_key, prompt, model=model, aspect_ratio=aspect_ratio,
+    )
     for attempt in range(1, max_polls + 1):
         if on_progress:
             await on_progress(attempt, max_polls)

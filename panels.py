@@ -37,7 +37,7 @@ from app import ext
 import storage as st
 import model_registry as mr
 from providers import list_provider_connections
-from shared import MYSTIC_MODELS
+from shared import MYSTIC_MODELS, is_image_url_expired
 
 _MODEL_OPTIONS = (
     [{"value": "", "label": "Mystic default"},
@@ -286,10 +286,27 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     status = asset.get("status", "pending")
     body_children: list[ui.UINode] = []
 
-    if asset.get("image_url"):
+    url_expired = status == "ready" and is_image_url_expired(asset.get("image_url", ""))
+
+    if asset.get("image_url") and not url_expired:
         body_children.append(ui.Image(
             src=asset["image_url"], alt=asset.get("alt_text", ""),
             width="100%", object_fit="cover",
+        ))
+    elif url_expired:
+        # Root cause of the reported "status=ready but shows Image
+        # unavailable" bug: Magnific/Freepik's CDN link carries a token that
+        # expires a few hours after generation, but `status` never gets
+        # re-checked. Surfacing this explicitly (instead of a silently
+        # broken <img>) tells the user exactly why and what to do --
+        # "Regenerate" below now actually works for this asset since
+        # generate_media_package/regenerate_asset no longer treat an expired
+        # "ready" asset as already done.
+        body_children.append(ui.Alert(
+            title="Image link expired",
+            message="This image was generated earlier and its hosted link "
+                    "has expired. Click Regenerate below to get a fresh one.",
+            type="warning",
         ))
     elif status == "generating":
         body_children.append(ui.Loading(message="Generating..."))
