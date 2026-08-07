@@ -322,15 +322,15 @@ async def test_create_media_brief_invalid_model_rejected(ctx):
 
 
 @pytest.mark.asyncio
-async def test_create_media_brief_omitted_model_is_unchanged_default(ctx):
-    """Backward compatibility: no `model` passed behaves exactly like v1 --
-    every asset's model stays "" (Mystic's own default, never sent to the API)."""
+async def test_create_media_brief_omitted_model_uses_third_party_auto_policy(ctx):
+    """No explicit model is now intentionally third-party-first, not Mystic."""
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=1),
     )
     assert result.status == "success"
-    assert result.data.model == ""
-    assert all(a.model == "" for a in result.data.assets)
+    assert result.data.model == "auto"
+    assert all(a.model in {"imagen4-ultra", "imagen4-fast", "gemini-2.5-flash"}
+               for a in result.data.assets)
 
 
 @pytest.mark.asyncio

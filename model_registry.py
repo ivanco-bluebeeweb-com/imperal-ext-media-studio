@@ -142,7 +142,10 @@ MODELS: dict[str, ModelSpec] = {
     ),
 }
 
-DEFAULT_MODEL_ID = "mystic"
+# New briefs must never silently begin on Magnific's own Mystic model.
+# ``auto`` is resolved to one of the third-party Google models below; Mystic
+# remains callable only as the technical-failure fallback or an explicit choice.
+DEFAULT_MODEL_ID = "imagen4-ultra"
 
 # Legacy Mystic-only sub-styles (see shared.MYSTIC_MODELS) stay valid ONLY
 # when the chosen model id is "mystic" -- they are Mystic's own style
@@ -180,26 +183,18 @@ def pick_model(role: str, prompt: str, style_direction: str) -> str:
     of an unreplicable black box.
 
     Rules, in priority order:
-    1. Illustrative/diagram cues -> Mystic (its editorial/flexible styles
-       cover this; the other registered models are photoreal-first).
-    2. Portrait/people cues -> Gemini 2.5 Flash (Google's docs position
-       Gemini/Nano Banana as the people-and-editing-oriented tier).
-    3. Featured role + photoreal cues (or no cues at all, since a featured
-       hero image benefits most from the higher-fidelity tier) -> Imagen 4
-       Ultra.
-    4. Inline role + photoreal cues -> Imagen 4 Fast (cheaper/faster, and
-       Magnific's own docs position Fast for "rapid iteration and cost-
-       effective batch generation" -- exactly an inline slot's job).
-    5. Anything else -> Mystic, the safe general-purpose default.
+    1. Portrait/people cues -> Gemini 2.5 Flash.
+    2. Featured role -> Imagen 4 Ultra.
+    3. Inline/illustrative/diagram and all remaining work -> Imagen 4 Fast.
+
+    The policy intentionally returns a third-party model in every automatic
+    case. Mystic is *not* a quality default: handlers retry it only after the
+    selected third-party endpoint fails technically.
     """
     text = f"{prompt} {style_direction}".lower()
 
-    if any(h in text for h in _ILLUSTRATIVE_HINTS):
-        return "mystic"
     if any(h in text for h in _PORTRAIT_HINTS):
         return "gemini-2.5-flash"
     if role == "featured":
         return "imagen4-ultra"
-    if any(h in text for h in _PHOTOREAL_HINTS):
-        return "imagen4-fast"
-    return "mystic"
+    return "imagen4-fast"

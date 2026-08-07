@@ -59,15 +59,12 @@ class CreateMediaBriefParams(BaseModel):
         2, ge=0, le=8, description="How many inline supporting images besides "
                                    "the featured image (0-8).")
     model: str = Field(
-        "", description="Which model to use for every asset in this brief. "
-                        "Options: a Mystic style ('realism', 'fluid', 'zen', "
-                        "'flexible', 'super_real', 'editorial_portraits'), a "
-                        "specific model ('mystic', 'imagen4-fast', "
-                        "'imagen4-ultra', 'gemini-2.5-flash'), or 'auto' to let "
-                        "Media Hub automatically pick the best model per image "
-                        "role and prompt -- same idea as Magnific's own web app "
-                        "'Auto' option. Omit entirely for Mystic's own default "
-                        "(unchanged v1 behaviour).")
+        "auto", description="Which model to use for every asset in this brief. "
+                        "Default 'auto' selects a third-party model available through "
+                        "Magnific (Google Imagen or Gemini) for every asset. Choose a "
+                        "specific model when needed. Mystic is reserved for the automatic "
+                        "technical-failure fallback or an explicit user choice; it is never "
+                        "the silent default.")
     lang: str = Field(
         "", description="The POST's own language code, e.g. 'ru', 'ro', 'en' -- "
                         "used for alt text/caption wording, which must match the "

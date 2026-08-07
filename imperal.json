@@ -57,9 +57,21 @@
             "type": "integer"
           },
           "model": {
-            "default": "",
-            "description": "Which model to use for every asset in this brief. Options: a Mystic style ('realism', 'fluid', 'zen', 'flexible', 'super_real', 'editorial_portraits'), a specific model ('mystic', 'imagen4-fast', 'imagen4-ultra', 'gemini-2.5-flash'), or 'auto' to let Media Hub automatically pick the best model per image role and prompt -- same idea as Magnific's own web app 'Auto' option. Omit entirely for Mystic's own default (unchanged v1 behaviour).",
+            "default": "auto",
+            "description": "Which model to use for every asset in this brief. Default 'auto' selects a third-party model available through Magnific (Google Imagen or Gemini) for every asset. Choose a specific model when needed. Mystic is reserved for the automatic technical-failure fallback or an explicit user choice; it is never the silent default.",
             "title": "Model",
+            "type": "string"
+          },
+          "lang": {
+            "default": "",
+            "description": "The POST's own language code, e.g. 'ru', 'ro', 'en' -- used for alt text/caption wording, which must match the article's language (unlike the image PROMPT, which is always generated in English regardless of this field).",
+            "title": "Lang",
+            "type": "string"
+          },
+          "native_title": {
+            "default": "",
+            "description": "The article title written in the post's OWN language (lang) -- used ONLY to build default alt text/caption. Keep 'article_title' itself in English (it feeds the image prompt, which must stay English); pass the real, native-language title here so alt text/caption come out correct for the post instead of defaulting to English. Omit to fall back to article_title (English default, same as v1 behaviour).",
+            "title": "Native Title",
             "type": "string"
           }
         },
@@ -278,6 +290,16 @@
           "model": {
             "default": "",
             "title": "Model",
+            "type": "string"
+          },
+          "lang": {
+            "default": "",
+            "title": "Lang",
+            "type": "string"
+          },
+          "native_title": {
+            "default": "",
+            "title": "Native Title",
             "type": "string"
           },
           "assets": {
@@ -545,6 +567,16 @@
           "model": {
             "default": "",
             "title": "Model",
+            "type": "string"
+          },
+          "lang": {
+            "default": "",
+            "title": "Lang",
+            "type": "string"
+          },
+          "native_title": {
+            "default": "",
+            "title": "Native Title",
             "type": "string"
           },
           "assets": {
@@ -825,6 +857,16 @@
             "title": "Model",
             "type": "string"
           },
+          "lang": {
+            "default": "",
+            "title": "Lang",
+            "type": "string"
+          },
+          "native_title": {
+            "default": "",
+            "title": "Native Title",
+            "type": "string"
+          },
           "assets": {
             "items": {
               "$ref": "#/$defs/MediaAsset"
@@ -1088,6 +1130,16 @@
           "model": {
             "default": "",
             "title": "Model",
+            "type": "string"
+          },
+          "lang": {
+            "default": "",
+            "title": "Lang",
+            "type": "string"
+          },
+          "native_title": {
+            "default": "",
+            "title": "Native Title",
             "type": "string"
           },
           "assets": {

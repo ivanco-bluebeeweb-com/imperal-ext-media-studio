@@ -98,6 +98,32 @@ async def test_generate_media_package_routes_registry_model_through_generic_path
 
 
 @pytest.mark.asyncio
+async def test_generate_media_package_falls_back_to_mystic_only_after_third_party_failure(
+    ctx_with_key, monkeypatch,
+):
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
+                                              model="imagen4-ultra"),
+    )
+    calls = []
+
+    async def fail_third_party(ctx, api_key, prompt, spec, **kwargs):
+        calls.append(("third_party", spec.id))
+        raise h.mc.ProviderError("endpoint unavailable", "MEDIA_PROVIDER_ERROR")
+
+    async def mystic_fallback(ctx, api_key, prompt, **kwargs):
+        calls.append(("mystic", kwargs.get("model")))
+        return "https://cdn.example/fallback.png"
+
+    monkeypatch.setattr(h.mc, "generate_image_with_model", fail_third_party)
+    monkeypatch.setattr(h.mc, "generate_image", mystic_fallback)
+    await h.generate_media_package(
+        ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
+    )
+    assert calls == [("third_party", "imagen4-ultra"), ("mystic", "")]
+
+
+@pytest.mark.asyncio
 async def test_regenerate_asset_accepts_auto_override(ctx_with_key, monkeypatch):
     brief = await h.create_media_brief(
         ctx_with_key, CreateMediaBriefParams(article_title="T", inline_count=0),

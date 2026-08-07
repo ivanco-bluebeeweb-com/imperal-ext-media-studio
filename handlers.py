@@ -103,9 +103,24 @@ async def _generate_asset_image(ctx, api_key: str, asset: dict, *, on_progress=N
             aspect_ratio=ASPECT_RATIO_4_3, on_progress=on_progress,
         )
     spec = mr.get_model(model)
-    return await mc.generate_image_with_model(
-        ctx, api_key, asset["prompt"], spec, on_progress=on_progress,
-    )
+    try:
+        return await mc.generate_image_with_model(
+            ctx, api_key, asset["prompt"], spec, on_progress=on_progress,
+        )
+    except mc.ProviderError as exc:
+        # Policy: third-party models are always preferred. Magnific's own
+        # Mystic is used only after the selected third-party endpoint reports
+        # a technical failure, never as an automatic first choice.
+        if spec.provider == "magnific":
+            raise
+        await ctx.log(
+            "Third-party Magnific model failed technically; retrying asset with Mystic fallback.",
+            level="warning",
+        )
+        return await mc.generate_image(
+            ctx, api_key, asset["prompt"], model="",
+            aspect_ratio=ASPECT_RATIO_4_3, on_progress=on_progress,
+        )
 
 
 def _package_to_entity(row: dict) -> MediaPackage:

@@ -16,9 +16,9 @@ def test_is_known_model_rejects_unregistered():
     assert not mr.is_known_model("not-a-model")
 
 
-def test_get_model_defaults_to_mystic():
-    assert mr.get_model("").id == "mystic"
-    assert mr.get_model("bogus-id-not-in-registry") is mr.MODELS["mystic"]
+def test_get_model_defaults_to_third_party_imagen():
+    assert mr.get_model("").id == "imagen4-ultra"
+    assert mr.get_model("bogus-id-not-in-registry") is mr.MODELS["imagen4-ultra"]
 
 
 def test_get_model_returns_the_right_spec():
@@ -58,9 +58,9 @@ def test_gemini_body_has_no_aspect_ratio_field_documented_exception():
 
 # --------------------------- pick_model (auto) ---------------------------
 
-def test_pick_model_illustrative_cue_prefers_mystic():
-    assert mr.pick_model("featured", "a clean diagram of airflow", "") == "mystic"
-    assert mr.pick_model("inline_1", "a simple icon", "infographic style") == "mystic"
+def test_pick_model_illustrative_cue_uses_third_party_model():
+    assert mr.pick_model("featured", "a clean diagram of airflow", "") == "imagen4-ultra"
+    assert mr.pick_model("inline_1", "a simple icon", "infographic style") == "imagen4-fast"
 
 
 def test_pick_model_portrait_cue_prefers_gemini():
@@ -77,8 +77,8 @@ def test_pick_model_inline_photoreal_uses_imagen_fast():
     assert mr.pick_model("inline_1", "a realistic product shot of a fan unit", "") == "imagen4-fast"
 
 
-def test_pick_model_inline_with_no_cues_falls_back_to_mystic():
-    assert mr.pick_model("inline_2", "something generic", "") == "mystic"
+def test_pick_model_inline_with_no_cues_uses_third_party_imagen_fast():
+    assert mr.pick_model("inline_2", "something generic", "") == "imagen4-fast"
 
 
 def test_pick_model_always_returns_a_registered_model():
