@@ -122,24 +122,32 @@ ASPECT_RATIO_4_3 = "classic_4_3"
 _LANG_NAMES = {"ru": "Russian", "ro": "Romanian"}
 
 
-def text_policy_clause(role: str, text_policy: str) -> str:
+def text_policy_clause(role: str, text_policy: str, image_text: str = "") -> str:
     """Framing clause for whether THIS asset may render legible in-image
     text (labels, numbers, short captions baked into the picture) or must
     stay text-free -- driven by Content Strategy Hub's per-brief decision
-    (see `TEXT_POLICY_NO_TEXT`/`TEXT_POLICY_ALLOW_TEXT` above), not a fixed
-    string every prompt got regardless of the article's actual needs.
+    (see `TEXT_POLICY_NO_TEXT`/`TEXT_POLICY_ALLOW_TEXT` above).
+
+    This is deliberately binary and explicit, never a vague maybe: either
+    the image is text-free, or the prompt states the EXACT words the model
+    must render. A prompt that merely permitted "a label if it fits" gave
+    an image model nothing concrete to draw, so it either invented
+    meaningless text or drew nothing -- neither is a real answer to
+    "with what text". `image_text` is the caller's own supplied wording
+    (e.g. a brief's CTA phrase or a price); TEXT_POLICY_ALLOW_TEXT without
+    it falls back to TEXT_POLICY_NO_TEXT's clause instead of guessing.
     """
-    if text_policy == TEXT_POLICY_ALLOW_TEXT:
-        return ("Legible short in-image text (e.g. a label, number, or "
-                "one-line caption relevant to the subject) is allowed if "
-                "it naturally fits the scene, but keep any such text "
-                "minimal and clearly readable, no logos.")
+    if text_policy == TEXT_POLICY_ALLOW_TEXT and image_text.strip():
+        return (f'Render this exact short text legibly within the image, '
+                 f'naturally integrated into the scene (e.g. as a label, '
+                 f'sign, screen, or caption): "{image_text.strip()}". No '
+                 f'other text or logos.')
     return "clean composition, no embedded text or logos."
 
 
 def prompt_for_role(
     role: str, article_title: str, summary: str, style_direction: str, lang: str = "",
-    text_policy: str = TEXT_POLICY_NO_TEXT,
+    text_policy: str = TEXT_POLICY_NO_TEXT, image_text: str = "",
 ) -> str:
     """Build an image-generation prompt for one asset role.
 
@@ -159,11 +167,13 @@ def prompt_for_role(
 
     `text_policy` (TEXT_POLICY_NO_TEXT default, or TEXT_POLICY_ALLOW_TEXT)
     decides whether the framing clause forbids or permits legible in-image
-    text -- see `text_policy_clause`.
+    text -- see `text_policy_clause`. When TEXT_POLICY_ALLOW_TEXT is used,
+    `image_text` must carry the actual words to render; the clause always
+    states either "no text" or the exact text, never a vague "maybe".
     """
     base = summary.strip() or article_title.strip() or "a professional editorial photo"
     style = f" Style: {style_direction.strip()}." if style_direction.strip() else ""
-    text_clause = text_policy_clause(role, text_policy)
+    text_clause = text_policy_clause(role, text_policy, image_text)
     if role == "featured":
         framing = f"Wide hero shot suitable as a blog featured image, {text_clause}"
     else:

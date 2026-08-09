@@ -58,12 +58,20 @@ class CreateMediaBriefParams(BaseModel):
     text_policy: str = Field(
         "no_text", description="Whether generated images may render legible "
                         "in-image text: 'no_text' (default -- clean, text-free "
-                        "compositions) or 'allow_text' (permits a short label/"
-                        "number/caption baked into the image when the article's "
-                        "content calls for it, e.g. a comparison or pricing "
-                        "piece). Content Strategy Hub decides this per brief; "
-                        "an approved Visual Profile that forbids in-image text "
-                        "always overrides an 'allow_text' request.")
+                        "compositions) or 'allow_text' (renders the EXACT words "
+                        "given in `image_text` baked into the image, e.g. a "
+                        "price or a comparison label). Content Strategy Hub "
+                        "decides this per brief; an approved Visual Profile "
+                        "that forbids in-image text always overrides an "
+                        "'allow_text' request. 'allow_text' without a non-empty "
+                        "`image_text` is rejected -- the prompt must always be "
+                        "explicit about EITHER no text OR the specific text, "
+                        "never a vague 'maybe some text'.")
+    image_text: str = Field(
+        "", description="The EXACT short text (a label, price, number, or "
+                        "one-line phrase) the image must legibly render. "
+                        "Required when text_policy='allow_text'; ignored/must "
+                        "be empty for 'no_text'.")
     inline_count: int = Field(
         2, ge=0, le=8, description="How many inline supporting images besides "
                                    "the featured image (0-8).")
@@ -145,6 +153,7 @@ class MediaAsset(sdl.Entity):
     """One image within a package -- featured or one of the inline slots."""
     role: str = ""              # "featured" | "inline_1" | "inline_2" | ...
     status: str = ""            # "pending" | "generating" | "ready" | "failed"
+    image_text: str = ""        # exact text rendered in-image when text_policy=allow_text; "" for no_text
     provider: str = ""          # "magnific" (first and, for now, only backend)
     provider_task_id: str = ""
     model: str = ""              # Mystic model used, "" = provider default
@@ -163,6 +172,7 @@ class MediaPackage(sdl.Entity):
     summary: str = ""
     style_direction: str = ""
     text_policy: str = "no_text"  # "no_text" | "allow_text" -- see CreateMediaBriefParams.text_policy
+    image_text: str = ""        # exact text rendered in-image when text_policy=allow_text -- see CreateMediaBriefParams.image_text
     status: str = ""            # "draft" | "generating" | "ready" | "failed"
     inline_count: int = 0
     model: str = ""              # Mystic model for this brief, "" = provider default

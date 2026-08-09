@@ -51,6 +51,8 @@ from models import (
 )
 from shared import (
     ASPECT_RATIO_4_3,
+    TEXT_POLICY_ALLOW_TEXT,
+    TEXT_POLICY_NO_TEXT,
     VALID_TEXT_POLICIES,
     contains_non_english_text,
     default_alt_text,
@@ -151,6 +153,7 @@ def _package_to_entity(row: dict) -> MediaPackage:
         summary=row.get("summary", ""),
         style_direction=row.get("style_direction", ""),
         text_policy=row.get("text_policy", "no_text"),
+        image_text=row.get("image_text", ""),
         status=row.get("status", "draft"),
         model=row.get("model", ""),
         lang=row.get("lang", ""),
@@ -193,6 +196,17 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             f"Use one of: {', '.join(VALID_TEXT_POLICIES)}",
             c.MEDIA_INVALID_TEXT_POLICY,
         )
+    image_text = params.image_text.strip()
+    if text_policy == TEXT_POLICY_ALLOW_TEXT and not image_text:
+        return _error(
+            "text_policy='allow_text' needs the actual words to render -- "
+            "pass them in image_text (e.g. a price, a short label, a one-line "
+            "phrase). A prompt can never just say 'maybe some text': it must "
+            "say either 'no text' or the exact text.",
+            c.MEDIA_INVALID_TEXT_POLICY,
+        )
+    if text_policy == TEXT_POLICY_NO_TEXT:
+        image_text = ""
 
     non_english = contains_non_english_text(
         params.article_title, params.summary, params.style_direction,
@@ -212,7 +226,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
     for role in roles:
         prompt = prompt_for_role(
             role, params.article_title, params.summary, params.style_direction,
-            params.lang.strip(), text_policy,
+            params.lang.strip(), text_policy, image_text,
         )
         resolved_model = _resolve_asset_model(
             role, model_choice, prompt, params.style_direction,
@@ -238,6 +252,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
         "summary": params.summary,
         "style_direction": params.style_direction,
         "text_policy": text_policy,
+        "image_text": image_text,
         "status": "draft",
         "model": model_choice,
         "lang": params.lang.strip().lower(),

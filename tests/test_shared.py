@@ -171,10 +171,20 @@ def test_text_policy_clause_default_forbids_text():
     assert "no embedded text" in clause
 
 
-def test_text_policy_clause_allow_text_permits_legible_text():
+def test_text_policy_clause_allow_text_without_image_text_falls_back_to_no_text():
+    """A vague 'maybe some text' is never acceptable -- allow_text with no
+    actual words to render must degrade to the explicit no-text clause."""
     clause = shared.text_policy_clause("featured", shared.TEXT_POLICY_ALLOW_TEXT)
+    assert "no embedded text" in clause
+
+
+def test_text_policy_clause_allow_text_with_image_text_states_the_exact_words():
+    clause = shared.text_policy_clause(
+        "featured", shared.TEXT_POLICY_ALLOW_TEXT, image_text="From $49/month",
+    )
     assert "no embedded text" not in clause
-    assert "legible" in clause.lower() or "text" in clause.lower()
+    assert "From $49/month" in clause
+    assert "exact" in clause.lower()
 
 
 def test_prompt_for_role_default_is_text_free():
@@ -182,8 +192,17 @@ def test_prompt_for_role_default_is_text_free():
     assert "no embedded text" in prompt
 
 
-def test_prompt_for_role_allow_text_drops_the_no_text_clause():
+def test_prompt_for_role_allow_text_without_image_text_stays_text_free():
     prompt = shared.prompt_for_role(
         "featured", "Price comparison", "A guide", "", text_policy=shared.TEXT_POLICY_ALLOW_TEXT,
     )
+    assert "no embedded text" in prompt
+
+
+def test_prompt_for_role_allow_text_with_image_text_states_the_exact_words():
+    prompt = shared.prompt_for_role(
+        "featured", "Price comparison", "A guide", "",
+        text_policy=shared.TEXT_POLICY_ALLOW_TEXT, image_text="From $49/month",
+    )
     assert "no embedded text" not in prompt
+    assert "From $49/month" in prompt

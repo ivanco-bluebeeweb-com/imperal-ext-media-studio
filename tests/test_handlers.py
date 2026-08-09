@@ -96,16 +96,29 @@ async def test_create_media_brief_default_text_policy_forbids_in_image_text(ctx)
 
 
 @pytest.mark.asyncio
-async def test_create_media_brief_allow_text_policy_changes_the_prompt(ctx):
+async def test_create_media_brief_allow_text_policy_renders_the_exact_words(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="g4s.md", article_title="Price comparison", summary="A guide",
+            inline_count=0, text_policy="allow_text", image_text="From $49/month",
+        ),
+    )
+    assert result.status == "success"
+    assert result.data.text_policy == "allow_text"
+    assert "From $49/month" in result.data.assets[0].prompt
+    assert "no embedded text" not in result.data.assets[0].prompt
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_allow_text_without_image_text_is_rejected(ctx):
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(
             site="g4s.md", article_title="Price comparison", summary="A guide",
             inline_count=0, text_policy="allow_text",
         ),
     )
-    assert result.status == "success"
-    assert result.data.text_policy == "allow_text"
-    assert "no embedded text" not in result.data.assets[0].prompt
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_INVALID_TEXT_POLICY
 
 
 @pytest.mark.asyncio
