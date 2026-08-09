@@ -32,6 +32,49 @@ def is_valid_model(model: str) -> bool:
     return model == "" or model in MYSTIC_MODELS
 
 
+def slugify(text: str, max_words: int = 8) -> str:
+    """Turn free English text into a lowercase, hyphenated, ASCII slug --
+    the same shape search engines and AEO/answer engines expect from a
+    filename (e.g. 'heat-recovery-ventilator-for-apartments'), not the raw
+    provider-generated name like 'result_IMAGEN4_ULTRA_f992763b...png' that
+    upload_media was producing before this existed.
+
+    Deliberately simple (word-splitting + a denylist regex) rather than a
+    full Unicode transliteration table: `text` here is always the brief's
+    English `article_title` (gated non-English at brief-creation time), so
+    there is no Cyrillic/Romanian text to transliterate in the first place.
+    """
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return "-".join(words[:max_words]) or "image"
+
+
+def filename_for_asset(article_title: str, role: str) -> str:
+    """SEO/AEO-optimized base filename (no extension) for one asset --
+    the topic slug plus a role suffix so featured/inline_1/inline_2 never
+    collide, e.g. 'heat-recovery-ventilator-for-apartments-featured'.
+
+    This is what actually lands as the file name once the image reaches a
+    site (WordPress Hub's upload_media/create_post carries it through to
+    the Imperal Bridge, which now honours an explicit filename instead of
+    deriving one from the provider's own generated URL).
+    """
+    base = slugify(article_title)
+    suffix = "featured" if role == "featured" else role.replace("_", "-")
+    return f"{base}-{suffix}"
+
+
+# Text-on-image policy: whether the generated image itself is ALLOWED to
+# render legible text (labels, numbers, short captions baked into the
+# picture) or must stay text-free. Content Strategy Hub decides this per
+# brief (e.g. a price/comparison article benefits from a labelled diagram;
+# a generic hero shot should not have random illegible text) and it flows
+# through create_media_brief/build_media_brief_handoff -- see
+# `text_policy_clause` below for how it changes the actual prompt.
+TEXT_POLICY_NO_TEXT = "no_text"
+TEXT_POLICY_ALLOW_TEXT = "allow_text"
+VALID_TEXT_POLICIES = (TEXT_POLICY_NO_TEXT, TEXT_POLICY_ALLOW_TEXT)
+
+
 def is_valid_model_choice(model: str) -> bool:
     """True for everything `model` is now allowed to be: empty (Mystic
     default), a Mystic sub-style, \"auto\" (automatic model selection --
@@ -79,8 +122,24 @@ ASPECT_RATIO_4_3 = "classic_4_3"
 _LANG_NAMES = {"ru": "Russian", "ro": "Romanian"}
 
 
+def text_policy_clause(role: str, text_policy: str) -> str:
+    """Framing clause for whether THIS asset may render legible in-image
+    text (labels, numbers, short captions baked into the picture) or must
+    stay text-free -- driven by Content Strategy Hub's per-brief decision
+    (see `TEXT_POLICY_NO_TEXT`/`TEXT_POLICY_ALLOW_TEXT` above), not a fixed
+    string every prompt got regardless of the article's actual needs.
+    """
+    if text_policy == TEXT_POLICY_ALLOW_TEXT:
+        return ("Legible short in-image text (e.g. a label, number, or "
+                "one-line caption relevant to the subject) is allowed if "
+                "it naturally fits the scene, but keep any such text "
+                "minimal and clearly readable, no logos.")
+    return "clean composition, no embedded text or logos."
+
+
 def prompt_for_role(
     role: str, article_title: str, summary: str, style_direction: str, lang: str = "",
+    text_policy: str = TEXT_POLICY_NO_TEXT,
 ) -> str:
     """Build an image-generation prompt for one asset role.
 
@@ -97,15 +156,19 @@ def prompt_for_role(
     the user's standing directive. When style_direction already says
     "no embedded text" this clause is harmless (there's no text to render),
     so it's always safe to add rather than conditional on style_direction.
+
+    `text_policy` (TEXT_POLICY_NO_TEXT default, or TEXT_POLICY_ALLOW_TEXT)
+    decides whether the framing clause forbids or permits legible in-image
+    text -- see `text_policy_clause`.
     """
     base = summary.strip() or article_title.strip() or "a professional editorial photo"
     style = f" Style: {style_direction.strip()}." if style_direction.strip() else ""
+    text_clause = text_policy_clause(role, text_policy)
     if role == "featured":
-        framing = ("Wide hero shot suitable as a blog featured image, "
-                   "clean composition, no embedded text or logos.")
+        framing = f"Wide hero shot suitable as a blog featured image, {text_clause}"
     else:
-        framing = ("A supporting detail shot illustrating a different aspect "
-                   "of the same subject, no embedded text or logos.")
+        framing = (f"A supporting detail shot illustrating a different aspect "
+                   f"of the same subject, {text_clause}")
     lang_name = _LANG_NAMES.get(lang)
     lang_clause = (
         f" If any text, signage, labels or captions appear within the "

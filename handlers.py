@@ -51,9 +51,11 @@ from models import (
 )
 from shared import (
     ASPECT_RATIO_4_3,
+    VALID_TEXT_POLICIES,
     contains_non_english_text,
     default_alt_text,
     error as _error,
+    filename_for_asset,
     is_image_url_expired,
     is_valid_model,
     is_valid_model_choice,
@@ -133,6 +135,7 @@ def _package_to_entity(row: dict) -> MediaPackage:
             model=a.get("model", ""),
             status=a.get("status", "pending"),
             image_url=a.get("image_url", ""),
+            filename=a.get("filename", ""),
             alt_text=a.get("alt_text", ""),
             caption=a.get("caption", ""),
             prompt=a.get("prompt", ""),
@@ -147,6 +150,7 @@ def _package_to_entity(row: dict) -> MediaPackage:
         article_title=row.get("article_title", ""),
         summary=row.get("summary", ""),
         style_direction=row.get("style_direction", ""),
+        text_policy=row.get("text_policy", "no_text"),
         status=row.get("status", "draft"),
         model=row.get("model", ""),
         lang=row.get("lang", ""),
@@ -182,6 +186,13 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             f"Use one of: {valid_model_choices_hint()}",
             c.MEDIA_INVALID_MODEL,
         )
+    text_policy = (params.text_policy.strip() or "no_text").lower()
+    if text_policy not in VALID_TEXT_POLICIES:
+        return _error(
+            f"'{params.text_policy}' isn't a text_policy Media Hub knows. "
+            f"Use one of: {', '.join(VALID_TEXT_POLICIES)}",
+            c.MEDIA_INVALID_TEXT_POLICY,
+        )
 
     non_english = contains_non_english_text(
         params.article_title, params.summary, params.style_direction,
@@ -201,7 +212,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
     for role in roles:
         prompt = prompt_for_role(
             role, params.article_title, params.summary, params.style_direction,
-            params.lang.strip(),
+            params.lang.strip(), text_policy,
         )
         resolved_model = _resolve_asset_model(
             role, model_choice, prompt, params.style_direction,
@@ -214,6 +225,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             "model": resolved_model,
             "status": "pending",
             "image_url": "",
+            "filename": filename_for_asset(params.article_title or params.summary, role),
             "alt_text": "",
             "caption": "",
             "prompt": prompt,
@@ -225,6 +237,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
         "article_title": params.article_title,
         "summary": params.summary,
         "style_direction": params.style_direction,
+        "text_policy": text_policy,
         "status": "draft",
         "model": model_choice,
         "lang": params.lang.strip().lower(),
@@ -462,6 +475,13 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
             mr.get_model(resolved_model).provider
             if resolved_model in mr.MODELS else "magnific"
         )
+    if not target.get("filename"):
+        # Backfills a SEO/AEO filename for packages created before this
+        # field existed -- otherwise a regenerate on an old package would
+        # keep silently producing a provider-raw filename downstream.
+        target["filename"] = filename_for_asset(
+            row.get("article_title") or row.get("summary", ""), params.role,
+        )
     target["status"] = "generating"
     await st.update_package(ctx, params.package_id, {"assets": assets})
 
@@ -490,6 +510,7 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
             model=refreshed.get("model", ""),
             status=refreshed.get("status", ""),
             image_url=refreshed.get("image_url", ""),
+            filename=refreshed.get("filename", ""),
             alt_text=refreshed.get("alt_text", ""),
             caption=refreshed.get("caption", ""),
             prompt=refreshed.get("prompt", ""),
@@ -551,6 +572,7 @@ async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
         provider=target.get("provider", "magnific"),
         status=target.get("status", ""),
         image_url=target.get("image_url", ""),
+        filename=target.get("filename", ""),
         alt_text=target.get("alt_text", ""),
         caption=target.get("caption", ""),
         prompt=target.get("prompt", ""),

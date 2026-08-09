@@ -55,6 +55,15 @@ class CreateMediaBriefParams(BaseModel):
     style_direction: str = Field(
         "", description="Optional style guidance, e.g. 'industrial, realistic, "
                         "no text in image, blue/grey palette'.")
+    text_policy: str = Field(
+        "no_text", description="Whether generated images may render legible "
+                        "in-image text: 'no_text' (default -- clean, text-free "
+                        "compositions) or 'allow_text' (permits a short label/"
+                        "number/caption baked into the image when the article's "
+                        "content calls for it, e.g. a comparison or pricing "
+                        "piece). Content Strategy Hub decides this per brief; "
+                        "an approved Visual Profile that forbids in-image text "
+                        "always overrides an 'allow_text' request.")
     inline_count: int = Field(
         2, ge=0, le=8, description="How many inline supporting images besides "
                                    "the featured image (0-8).")
@@ -140,6 +149,7 @@ class MediaAsset(sdl.Entity):
     provider_task_id: str = ""
     model: str = ""              # Mystic model used, "" = provider default
     image_url: str = ""
+    filename: str = ""           # SEO/AEO-optimized base filename (no extension) -- carried through to the site's upload so the LIVE file name is never the provider's raw generated id
     prompt: str = ""
     alt_text: str = ""
     caption: str = ""
@@ -152,6 +162,7 @@ class MediaPackage(sdl.Entity):
     article_title: str = ""
     summary: str = ""
     style_direction: str = ""
+    text_policy: str = "no_text"  # "no_text" | "allow_text" -- see CreateMediaBriefParams.text_policy
     status: str = ""            # "draft" | "generating" | "ready" | "failed"
     inline_count: int = 0
     model: str = ""              # Mystic model for this brief, "" = provider default

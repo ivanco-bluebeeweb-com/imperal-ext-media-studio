@@ -127,3 +127,63 @@ def test_is_image_url_expired_exactly_at_deadline_is_expired():
 
 def test_aspect_ratio_4_3_is_the_documented_classic_4_3_enum_value():
     assert shared.ASPECT_RATIO_4_3 == "classic_4_3"
+
+
+# --------------------------- slugify / filename_for_asset ---------------------------
+
+def test_slugify_lowercases_and_hyphenates():
+    assert shared.slugify("Heat Recovery Ventilator") == "heat-recovery-ventilator"
+
+
+def test_slugify_strips_punctuation():
+    assert shared.slugify("Boilers 101: A Guide!") == "boilers-101-a-guide"
+
+
+def test_slugify_caps_word_count():
+    long_title = "one two three four five six seven eight nine ten"
+    assert shared.slugify(long_title) == "one-two-three-four-five-six-seven-eight"
+
+
+def test_slugify_empty_text_falls_back_to_image():
+    assert shared.slugify("") == "image"
+
+
+def test_filename_for_asset_featured_role():
+    assert shared.filename_for_asset("Heat Recovery Ventilator", "featured") == \
+        "heat-recovery-ventilator-featured"
+
+
+def test_filename_for_asset_inline_role_uses_hyphenated_suffix():
+    assert shared.filename_for_asset("Heat Recovery Ventilator", "inline_1") == \
+        "heat-recovery-ventilator-inline-1"
+
+
+def test_filename_for_asset_two_inline_roles_never_collide():
+    a = shared.filename_for_asset("Boilers 101", "inline_1")
+    b = shared.filename_for_asset("Boilers 101", "inline_2")
+    assert a != b
+
+
+# --------------------------- text_policy_clause ---------------------------
+
+def test_text_policy_clause_default_forbids_text():
+    clause = shared.text_policy_clause("featured", shared.TEXT_POLICY_NO_TEXT)
+    assert "no embedded text" in clause
+
+
+def test_text_policy_clause_allow_text_permits_legible_text():
+    clause = shared.text_policy_clause("featured", shared.TEXT_POLICY_ALLOW_TEXT)
+    assert "no embedded text" not in clause
+    assert "legible" in clause.lower() or "text" in clause.lower()
+
+
+def test_prompt_for_role_default_is_text_free():
+    prompt = shared.prompt_for_role("featured", "Boilers 101", "A guide", "")
+    assert "no embedded text" in prompt
+
+
+def test_prompt_for_role_allow_text_drops_the_no_text_clause():
+    prompt = shared.prompt_for_role(
+        "featured", "Price comparison", "A guide", "", text_policy=shared.TEXT_POLICY_ALLOW_TEXT,
+    )
+    assert "no embedded text" not in prompt

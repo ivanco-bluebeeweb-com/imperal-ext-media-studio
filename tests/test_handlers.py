@@ -72,6 +72,54 @@ async def test_create_media_brief_builds_featured_plus_inline_assets(ctx):
 
 
 @pytest.mark.asyncio
+async def test_create_media_brief_generates_seo_filenames_per_asset(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="g4s.md", article_title="Boilers 101", summary="A guide", inline_count=1,
+        ),
+    )
+    assert result.status == "success"
+    filenames = [a.filename for a in result.data.assets]
+    assert filenames == ["boilers-101-featured", "boilers-101-inline-1"]
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_default_text_policy_forbids_in_image_text(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="g4s.md", article_title="Boilers 101", summary="A guide", inline_count=0,
+        ),
+    )
+    assert result.status == "success"
+    assert result.data.text_policy == "no_text"
+    assert "no embedded text" in result.data.assets[0].prompt
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_allow_text_policy_changes_the_prompt(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="g4s.md", article_title="Price comparison", summary="A guide",
+            inline_count=0, text_policy="allow_text",
+        ),
+    )
+    assert result.status == "success"
+    assert result.data.text_policy == "allow_text"
+    assert "no embedded text" not in result.data.assets[0].prompt
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_rejects_unknown_text_policy(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="g4s.md", article_title="Boilers 101", inline_count=0, text_policy="maybe",
+        ),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_INVALID_TEXT_POLICY
+
+
+@pytest.mark.asyncio
 async def test_generate_media_package_missing_package(ctx):
     result = await h.generate_media_package(ctx, GenerateMediaPackageParams(package_id="nope"))
     assert result.status == "error"
@@ -309,6 +357,29 @@ async def test_regenerate_asset_success(ctx_with_key, monkeypatch):
     final = ctx_with_key.last_background_result
     assert final.status == "success"
     assert final.data.image_url == "https://cdn.example/regen.png"
+
+
+@pytest.mark.asyncio
+async def test_regenerate_asset_backfills_missing_filename_on_old_packages(ctx_with_key, monkeypatch):
+    """A package created before the filename field existed has no filename
+    on its assets -- regenerate_asset must backfill one rather than leave
+    it empty (which would fall through to a provider-raw filename later)."""
+    brief = await h.create_media_brief(
+        ctx_with_key, CreateMediaBriefParams(article_title="Heat recovery unit", inline_count=0),
+    )
+    row = await h.st.get_package(ctx_with_key, brief.data.id)
+    row["assets"][0]["filename"] = ""  # simulate a pre-existing package
+    await h.st.update_package(ctx_with_key, brief.data.id, {"assets": row["assets"]})
+
+    async def fake_generate_image(ctx, api_key, prompt, **kwargs):
+        return "https://cdn.example/regen.png"
+
+    monkeypatch.setattr(h.mc, "generate_image", fake_generate_image)
+    await h.regenerate_asset(
+        ctx_with_key, RegenerateAssetParams(package_id=brief.data.id, role="featured"),
+    )
+    final = ctx_with_key.last_background_result
+    assert final.data.filename == "heat-recovery-unit-featured"
 
 
 @pytest.mark.asyncio

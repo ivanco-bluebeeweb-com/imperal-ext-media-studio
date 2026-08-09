@@ -4,7 +4,7 @@ One collection, `packages`. IMPORTANT: `ctx.store.create()` mints its own
 doc id server-side -- it does not accept a caller-supplied id (confirmed by
 reading the real store client, not assumed). So `create_package` returns the
 id the store handed back; callers must use THAT id afterwards, not one
-generated up front. This differs from Asana/WP Site Connector's pattern of
+generated up front. This differs from Asana/WordPress Hub's pattern of
 scanning for an external provider id (site_id, gid) because we have no such
 external id here -- the store's own id IS the package id.
 """
