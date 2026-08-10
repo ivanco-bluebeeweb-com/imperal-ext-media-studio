@@ -48,6 +48,18 @@
             "title": "Style Direction",
             "type": "string"
           },
+          "text_policy": {
+            "default": "no_text",
+            "description": "Whether generated images may render legible in-image text: 'no_text' (default -- clean, text-free compositions) or 'allow_text' (renders the EXACT words given in `image_text` baked into the image, e.g. a price or a comparison label). Content Strategy Hub decides this per brief; an approved Visual Profile that forbids in-image text always overrides an 'allow_text' request. 'allow_text' without a non-empty `image_text` is rejected -- the prompt must always be explicit about EITHER no text OR the specific text, never a vague 'maybe some text'.",
+            "title": "Text Policy",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "description": "The EXACT short text (a label, price, number, or one-line phrase) the image must legibly render. Required when text_policy='allow_text'; ignored/must be empty for 'no_text'.",
+            "title": "Image Text",
+            "type": "string"
+          },
           "inline_count": {
             "default": 2,
             "description": "How many inline supporting images besides the featured image (0-8).",
@@ -149,6 +161,11 @@
                 "title": "Role",
                 "type": "string"
               },
+              "image_text": {
+                "default": "",
+                "title": "Image Text",
+                "type": "string"
+              },
               "provider": {
                 "default": "",
                 "title": "Provider",
@@ -167,6 +184,11 @@
               "image_url": {
                 "default": "",
                 "title": "Image Url",
+                "type": "string"
+              },
+              "filename": {
+                "default": "",
+                "title": "Filename",
                 "type": "string"
               },
               "prompt": {
@@ -280,6 +302,16 @@
           "style_direction": {
             "default": "",
             "title": "Style Direction",
+            "type": "string"
+          },
+          "text_policy": {
+            "default": "no_text",
+            "title": "Text Policy",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
             "type": "string"
           },
           "inline_count": {
@@ -426,6 +458,11 @@
                 "title": "Role",
                 "type": "string"
               },
+              "image_text": {
+                "default": "",
+                "title": "Image Text",
+                "type": "string"
+              },
               "provider": {
                 "default": "",
                 "title": "Provider",
@@ -444,6 +481,11 @@
               "image_url": {
                 "default": "",
                 "title": "Image Url",
+                "type": "string"
+              },
+              "filename": {
+                "default": "",
+                "title": "Filename",
                 "type": "string"
               },
               "prompt": {
@@ -557,6 +599,16 @@
           "style_direction": {
             "default": "",
             "title": "Style Direction",
+            "type": "string"
+          },
+          "text_policy": {
+            "default": "no_text",
+            "title": "Text Policy",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
             "type": "string"
           },
           "inline_count": {
@@ -714,6 +766,11 @@
                 "title": "Role",
                 "type": "string"
               },
+              "image_text": {
+                "default": "",
+                "title": "Image Text",
+                "type": "string"
+              },
               "provider": {
                 "default": "",
                 "title": "Provider",
@@ -732,6 +789,11 @@
               "image_url": {
                 "default": "",
                 "title": "Image Url",
+                "type": "string"
+              },
+              "filename": {
+                "default": "",
+                "title": "Filename",
                 "type": "string"
               },
               "prompt": {
@@ -845,6 +907,16 @@
           "style_direction": {
             "default": "",
             "title": "Style Direction",
+            "type": "string"
+          },
+          "text_policy": {
+            "default": "no_text",
+            "title": "Text Policy",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
             "type": "string"
           },
           "inline_count": {
@@ -989,6 +1061,11 @@
                 "title": "Role",
                 "type": "string"
               },
+              "image_text": {
+                "default": "",
+                "title": "Image Text",
+                "type": "string"
+              },
               "provider": {
                 "default": "",
                 "title": "Provider",
@@ -1007,6 +1084,11 @@
               "image_url": {
                 "default": "",
                 "title": "Image Url",
+                "type": "string"
+              },
+              "filename": {
+                "default": "",
+                "title": "Filename",
                 "type": "string"
               },
               "prompt": {
@@ -1120,6 +1202,16 @@
           "style_direction": {
             "default": "",
             "title": "Style Direction",
+            "type": "string"
+          },
+          "text_policy": {
+            "default": "no_text",
+            "title": "Text Policy",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
             "type": "string"
           },
           "inline_count": {
@@ -1282,6 +1374,11 @@
             "title": "Role",
             "type": "string"
           },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
+            "type": "string"
+          },
           "provider": {
             "default": "",
             "title": "Provider",
@@ -1300,6 +1397,11 @@
           "image_url": {
             "default": "",
             "title": "Image Url",
+            "type": "string"
+          },
+          "filename": {
+            "default": "",
+            "title": "Filename",
             "type": "string"
           },
           "prompt": {
@@ -1445,6 +1547,11 @@
             "title": "Role",
             "type": "string"
           },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
+            "type": "string"
+          },
           "provider": {
             "default": "",
             "title": "Provider",
@@ -1463,6 +1570,11 @@
           "image_url": {
             "default": "",
             "title": "Image Url",
+            "type": "string"
+          },
+          "filename": {
+            "default": "",
+            "title": "Filename",
             "type": "string"
           },
           "prompt": {
