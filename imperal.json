@@ -1907,6 +1907,347 @@
       "owner_chat_tool": "media-studio"
     },
     {
+      "name": "recover_stored_images",
+      "description": "Restore legacy Media Hub images whose original provider links expired. Finds only exact matches in the connected Magnific account, then copies them into Imperal storage so they remain available until deleted from this package.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Explicit empty input for the legacy image recovery pass.",
+        "properties": {},
+        "title": "RecoverStoredImagesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MediaAsset": {
+            "description": "One image within a package -- featured or one of the inline slots.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "default": "",
+                "title": "Status",
+                "type": "string"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "role": {
+                "default": "",
+                "title": "Role",
+                "type": "string"
+              },
+              "image_text": {
+                "default": "",
+                "title": "Image Text",
+                "type": "string"
+              },
+              "provider": {
+                "default": "",
+                "title": "Provider",
+                "type": "string"
+              },
+              "provider_task_id": {
+                "default": "",
+                "title": "Provider Task Id",
+                "type": "string"
+              },
+              "model": {
+                "default": "",
+                "title": "Model",
+                "type": "string"
+              },
+              "image_url": {
+                "default": "",
+                "title": "Image Url",
+                "type": "string"
+              },
+              "original_image_url": {
+                "default": "",
+                "title": "Original Image Url",
+                "type": "string"
+              },
+              "original_storage_path": {
+                "default": "",
+                "title": "Original Storage Path",
+                "type": "string"
+              },
+              "original_dimensions": {
+                "default": "",
+                "title": "Original Dimensions",
+                "type": "string"
+              },
+              "original_format": {
+                "default": "",
+                "title": "Original Format",
+                "type": "string"
+              },
+              "original_file_size": {
+                "default": "",
+                "title": "Original File Size",
+                "type": "string"
+              },
+              "upscaled_image_url": {
+                "default": "",
+                "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_storage_path": {
+                "default": "",
+                "title": "Upscaled Storage Path",
+                "type": "string"
+              },
+              "upscaled_dimensions": {
+                "default": "",
+                "title": "Upscaled Dimensions",
+                "type": "string"
+              },
+              "upscaled_format": {
+                "default": "",
+                "title": "Upscaled Format",
+                "type": "string"
+              },
+              "upscaled_file_size": {
+                "default": "",
+                "title": "Upscaled File Size",
+                "type": "string"
+              },
+              "filename": {
+                "default": "",
+                "title": "Filename",
+                "type": "string"
+              },
+              "prompt": {
+                "default": "",
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_text": {
+                "default": "",
+                "title": "Alt Text",
+                "type": "string"
+              },
+              "caption": {
+                "default": "",
+                "title": "Caption",
+                "type": "string"
+              },
+              "error_message": {
+                "default": "",
+                "title": "Error Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MediaAsset",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "A brief plus its generated (or in-progress) image assets.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site": {
+            "default": "",
+            "title": "Site",
+            "type": "string"
+          },
+          "article_title": {
+            "default": "",
+            "title": "Article Title",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "style_direction": {
+            "default": "",
+            "title": "Style Direction",
+            "type": "string"
+          },
+          "text_policy": {
+            "default": "no_text",
+            "title": "Text Policy",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
+            "type": "string"
+          },
+          "inline_count": {
+            "default": 0,
+            "title": "Inline Count",
+            "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "lang": {
+            "default": "",
+            "title": "Lang",
+            "type": "string"
+          },
+          "native_title": {
+            "default": "",
+            "title": "Native Title",
+            "type": "string"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/$defs/MediaAsset"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaPackage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.recover_stored_images",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
       "name": "delete_asset_image",
       "description": "Delete one stored image version from a media package. Choose original or upscaled; the other version and its metadata stay intact.",
       "action_type": "write",
@@ -3250,14 +3591,16 @@
       "list_model_discovery_log": 0,
       "list_providers": 0,
       "connect_magnific": 0,
-      "disconnect_magnific": 8
+      "disconnect_magnific": 8,
+      "recover_stored_images": 0
     },
     "free_tools": [
       "connect_magnific",
       "get_media_package",
       "list_media_packages",
       "list_model_discovery_log",
-      "list_providers"
+      "list_providers",
+      "recover_stored_images"
     ],
     "notes": "SYNCHRONISED WITH THE PLATFORM. Prices live in pricing_config.tool_prices on the platform side; this block is their testable repository copy. Write them via developer.update_pricing while the app is suspended. The scale reflects work and provider spend: free reads/key connection; 8 for local updates or disconnection; 12 for a new brief or a model-catalogue check; 20 for one Magnific image generation or upscale; 35 for a full multi-image package."
   }

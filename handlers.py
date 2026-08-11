@@ -36,6 +36,7 @@ import codes as c
 import image_dims
 import magnific_client as mc
 import model_registry as mr
+import recovery
 import storage as st
 from app import chat, ext
 from models import (
@@ -50,6 +51,7 @@ from models import (
     MediaAsset,
     MediaPackage,
     RegenerateAssetParams,
+    RecoverStoredImagesParams,
     UpdateAssetMetaParams,
 )
 from shared import (
@@ -787,6 +789,101 @@ async def generate_asset_upscale(ctx, params: GenerateAssetUpscaleParams) -> Act
         MediaAsset(id=target.get("role", ""), title=_asset_title(target.get("role", "")), role=target.get("role", ""), status="generating"),
         f"Creating a {scale_factor} upscaled version of '{params.role}'. I'll message you when it's ready.",
     )
+
+
+@chat.function(
+    "recover_stored_images",
+    "Restore legacy Media Hub images whose original provider links expired. Finds only exact matches in the connected Magnific account, then copies them into Imperal storage so they remain available until deleted from this package.",
+    action_type="write",
+    data_model=MediaPackage,
+    event="media-studio.recover_stored_images",
+    effects=["update:media_package"],
+)
+async def recover_stored_images(ctx, params: RecoverStoredImagesParams) -> ActionResult:
+    """Copy exact legacy Magnific matches into durable Imperal storage.
+
+    This never regenerates an image and never guesses a match. A provider URL
+    can be restored only when the Creations API returns exactly one creation
+    with the same original filename. The operation is idempotent: packages
+    already using Imperal storage are left untouched.
+    """
+    api_key = await ctx.secrets.get("magnific_api_key")
+    if not api_key:
+        return _error(
+            "No Magnific API key connected yet. Open Media Hub settings and paste your Magnific API key first.",
+            c.MEDIA_KEY_NOT_CONFIGURED,
+        )
+
+    rows = await st.list_packages(ctx, limit=100)
+    legacy_assets = [
+        asset for row in rows for asset in row.get("assets", [])
+        if asset.get("status") == "ready"
+        and not asset.get("original_storage_path")
+        and (asset.get("original_image_url") or asset.get("image_url", ""))
+    ]
+    if not legacy_assets:
+        return ActionResult.success(
+            MediaPackage(),
+            "Every ready Media Hub image is already stored permanently, or has no expired provider link to restore.",
+        )
+
+    try:
+        creation_urls = await recovery.list_recent_creation_urls(ctx, api_key)
+    except mc.ProviderError as exc:
+        return _error(f"Could not look up existing Magnific creations: {exc}", c.MEDIA_PROVIDER_ERROR)
+
+    restored = 0
+    unavailable = 0
+    for row in rows:
+        assets = list(row.get("assets", []))
+        matches = recovery.match_creation_urls(assets, creation_urls)
+        changed = False
+        for asset in assets:
+            role = asset.get("role", "")
+            legacy_url = asset.get("original_image_url") or asset.get("image_url", "")
+            source_url = matches.get(role, "")
+            if not (
+                asset.get("status") == "ready"
+                and not asset.get("original_storage_path")
+                and legacy_url
+            ):
+                continue
+            if not source_url:
+                unavailable += 1
+                continue
+            try:
+                raw = await mc.download_image_bytes(source_url)
+                stored_url, storage_path = await _store_image_bytes(
+                    ctx, raw, row["id"], role, "original", fallback_url=source_url,
+                )
+                image_format, dimensions = image_dims.describe_image(raw)
+            except Exception as exc:
+                await ctx.log(
+                    f"Could not copy legacy Media Hub image {row['id']}/{role}: {exc}",
+                    level="warning",
+                )
+                unavailable += 1
+                continue
+            asset.update(
+                image_url=stored_url,
+                original_image_url=stored_url,
+                original_storage_path=storage_path,
+                original_format=image_format,
+                original_dimensions=dimensions,
+                original_file_size=image_dims.format_file_size(len(raw)),
+            )
+            restored += 1
+            changed = True
+        if changed:
+            await st.update_package(ctx, row["id"], {"assets": assets})
+
+    summary = f"Restored {restored} image(s) into permanent Media Hub storage."
+    if unavailable:
+        summary += (
+            f" {unavailable} image(s) could not be restored because Magnific did not return "
+            "the exact original creation; they were left unchanged."
+        )
+    return ActionResult.success(MediaPackage(), summary)
 
 
 @chat.function(

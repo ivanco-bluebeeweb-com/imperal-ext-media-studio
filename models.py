@@ -173,6 +173,11 @@ class ListModelDiscoveryLogParams(BaseModel):
     limit: int = Field(30, ge=1, le=100)
 
 
+class RecoverStoredImagesParams(BaseModel):
+    """Explicit empty input for the legacy image recovery pass."""
+    pass
+
+
 # --------------------------- SDL entities ---------------------------
 
 class DeleteResult(sdl.Entity):

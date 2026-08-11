@@ -43,7 +43,7 @@ import magnific_client as mc
 import storage as st
 import model_registry as mr
 from providers import list_provider_connections
-from shared import MYSTIC_MODELS, is_image_url_expired
+from shared import MYSTIC_MODELS
 
 _MODEL_OPTIONS = (
     [{"value": "", "label": "Mystic default"},
@@ -258,6 +258,18 @@ def _settings_view(ctx, connections: list, log: list[dict]) -> ui.UINode:
         ))
     children.append(ui.Section(title="New model checks", children=discovery_children))
 
+    children.append(ui.Section(title="Image storage", children=[
+        ui.Text(
+            "Generated images are copied into Media Hub storage and stay available until you delete them. "
+            "Use this once to restore older images that were saved with an expired provider link.",
+            variant="caption",
+        ),
+        ui.Button(
+            "Restore older images", variant="secondary",
+            on_click=ui.Call("recover_stored_images"),
+        ),
+    ]))
+
     children.append(ui.Button(
         "Close", variant="ghost",
         on_click=ui.Call("__panel__studio", view=""),
@@ -272,11 +284,12 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     role = asset.get("role", "")
     status = asset.get("status", "pending")
     image_children: list[ui.UINode] = []
-    url_expired = status == "ready" and is_image_url_expired(asset.get("image_url", ""))
 
-    # The original is a distinct deliverable: never hide it behind its upscale.
+    # A ready image remains visible for the lifetime of its stored asset.
+    # Fresh assets use Imperal Storage; legacy assets are shown while the
+    # recovery pass replaces their provider URL with the stored copy.
     original_url = asset.get("original_image_url") or asset.get("image_url", "")
-    if original_url and not url_expired:
+    if original_url:
         image_children.extend([
             ui.Text("Original image", variant="label"),
             ui.Image(src=original_url, alt=asset.get("alt_text", ""), width="100%", object_fit="cover"),
@@ -308,12 +321,6 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
                     on_click=ui.Call("delete_asset_image", package_id=package_id, role=role, version="upscaled"),
                 ),
             ])
-    elif url_expired:
-        image_children.append(ui.Alert(
-            title="Image link expired",
-            message="This image was generated earlier and its hosted link has expired. Open Regenerate below to get a fresh one.",
-            type="warning",
-        ))
     elif status == "generating":
         image_children.append(ui.Loading(message="Generating..."))
     elif status == "failed":
@@ -323,7 +330,7 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
 
     image_title = asset.get("filename") or _asset_title(role)
     upscale_children: list[ui.UINode] = []
-    if original_url and not url_expired:
+    if original_url:
         upscale_children.append(ui.Form(
             action="generate_asset_upscale",
             submit_label="Generate Upscale",
