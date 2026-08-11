@@ -478,14 +478,25 @@ async def test_regenerate_asset_model_override_forwarded(ctx_with_key, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_update_asset_meta_edits_alt_and_caption(ctx):
+async def test_update_asset_meta_edits_all_pipeline_metadata(ctx):
     brief = await h.create_media_brief(ctx, CreateMediaBriefParams(article_title="T", inline_count=0))
     result = await h.update_asset_meta(ctx, UpdateAssetMetaParams(
-        package_id=brief.data.id, role="featured", alt_text="new alt", caption="new caption",
+        package_id=brief.data.id,
+        role="featured",
+        image_title="heat-pump-featured",
+        image_description="A modern heat pump beside a bright house.",
+        alt_text="new alt",
+        caption="new caption",
     ))
     assert result.status == "success"
+    assert result.data.filename == "heat-pump-featured"
+    assert result.data.prompt == "A modern heat pump beside a bright house."
     assert result.data.alt_text == "new alt"
     assert result.data.caption == "new caption"
+    stored = await h.st.get_package(ctx, brief.data.id)
+    asset = stored["assets"][0]
+    assert asset["filename"] == "heat-pump-featured"
+    assert asset["prompt"] == "A modern heat pump beside a bright house."
 
 
 @pytest.mark.asyncio

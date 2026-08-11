@@ -334,25 +334,26 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     else:
         upscale_children.append(ui.Text("Generate or regenerate the image before upscaling it.", variant="caption"))
 
-    metadata_children: list[ui.UINode] = [
-        ui.Text("Image title", variant="label"),
-        ui.Text(title_line, variant="caption"),
-        ui.Text("Image description", variant="label"),
-        ui.Text(asset.get("prompt", "") or "No description available.", variant="caption"),
-    ]
-    if asset.get("model"):
-        metadata_children.append(ui.Badge(label="Model", value=asset["model"], color="purple"))
-    metadata_children.append(ui.Form(
+    metadata_children: list[ui.UINode] = [ui.Form(
         action="update_asset_meta",
         submit_label="Save metadata",
         defaults={"package_id": package_id, "role": role},
         children=[
+            ui.Text("Image title", variant="label"),
+            ui.Input(param_name="image_title", placeholder="A clear file title", value=image_title),
+            ui.Text(title_line, variant="caption"),
+            ui.Text("Image description", variant="label"),
+            ui.TextArea(
+                param_name="image_description",
+                placeholder="Describe the image to generate, in English",
+                value=asset.get("prompt", ""),
+            ),
             ui.Text("Alt text", variant="label"),
             ui.Input(param_name="alt_text", placeholder="Describe the image for screen readers", value=asset.get("alt_text", "")),
             ui.Text("Caption", variant="label"),
             ui.Input(param_name="caption", placeholder="Short visible caption (optional)", value=asset.get("caption", "")),
         ],
-    ))
+    )]
 
     regenerate_children = [ui.Form(
         action="regenerate_asset",

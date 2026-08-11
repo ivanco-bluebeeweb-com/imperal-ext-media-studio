@@ -1848,7 +1848,7 @@
     },
     {
       "name": "update_asset_meta",
-      "description": "Edit the alt text and/or caption of one asset within a media package, without regenerating the image itself.",
+      "description": "Edit the image title, description, alt text, and/or caption of one asset without regenerating the image itself.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -1867,6 +1867,18 @@
             "default": "",
             "description": "Which asset to edit, e.g. 'featured'.",
             "title": "Role",
+            "type": "string"
+          },
+          "image_title": {
+            "default": "",
+            "description": "New image title / filename base. Omit to keep unchanged.",
+            "title": "Image Title",
+            "type": "string"
+          },
+          "image_description": {
+            "default": "",
+            "description": "New English generation description. Omit to keep unchanged.",
+            "title": "Image Description",
             "type": "string"
           },
           "alt_text": {

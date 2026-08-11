@@ -143,6 +143,10 @@ class GenerateAssetUpscaleParams(BaseModel):
 class UpdateAssetMetaParams(BaseModel):
     package_id: str = Field("", description="The media package id.")
     role: str = Field("", description="Which asset to edit, e.g. 'featured'.")
+    image_title: str = Field("", description="New image title / filename base. Omit to keep unchanged.")
+    image_description: str = Field(
+        "", description="New English generation description. Omit to keep unchanged."
+    )
     alt_text: str = Field("", description="New alt text. Omit to keep unchanged.")
     caption: str = Field("", description="New caption. Omit to keep unchanged.")
 

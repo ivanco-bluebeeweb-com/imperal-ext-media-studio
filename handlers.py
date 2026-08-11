@@ -731,7 +731,7 @@ async def generate_asset_upscale(ctx, params: GenerateAssetUpscaleParams) -> Act
 
 @chat.function(
     "update_asset_meta",
-    "Edit the alt text and/or caption of one asset within a media package, "
+    "Edit the image title, description, alt text, and/or caption of one asset "
     "without regenerating the image itself.",
     action_type="write",
     data_model=MediaAsset,
@@ -739,7 +739,7 @@ async def generate_asset_upscale(ctx, params: GenerateAssetUpscaleParams) -> Act
     effects=["update:media_package"],
 )
 async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
-    """Edit one asset's alt text and/or caption without regenerating the image."""
+    """Edit publish metadata without regenerating; description is reused on regeneration."""
     row = await st.get_package(ctx, params.package_id)
     if row is None:
         return _error(
@@ -753,6 +753,20 @@ async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
             f"No asset '{params.role}' in package '{params.package_id}'.",
             c.MEDIA_ASSET_NOT_FOUND,
         )
+    if params.image_title.strip():
+        target["filename"] = params.image_title.strip()
+    if params.image_description.strip():
+        description = params.image_description.strip()
+        non_english = contains_non_english_text(description)
+        if non_english:
+            return _error(
+                "Image description must be written in English -- Magnific Mystic is tuned "
+                f"for English input. Found non-English text: '{non_english[:40]}'.",
+                c.MEDIA_PROMPT_NOT_ENGLISH,
+            )
+        # `prompt` is the canonical pipeline field: generation, regeneration,
+        # exports and the card all read this same value.
+        target["prompt"] = description
     if params.alt_text.strip():
         target["alt_text"] = params.alt_text.strip()
     if params.caption.strip():
@@ -771,7 +785,7 @@ async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
         prompt=target.get("prompt", ""),
         error_message=target.get("error", ""),
     )
-    return ActionResult.success(asset_entity, f"Updated alt text/caption for '{params.role}'.")
+    return ActionResult.success(asset_entity, f"Updated metadata for '{params.role}'.")
 
 
 @chat.function(
