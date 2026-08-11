@@ -4,6 +4,7 @@ import codes as c
 import handlers as h
 from models import (
     CreateMediaBriefParams,
+    DeleteAssetImageParams,
     DeleteMediaPackageParams,
     GenerateMediaPackageParams,
     GetMediaPackageParams,
@@ -475,6 +476,33 @@ async def test_regenerate_asset_model_override_forwarded(ctx_with_key, monkeypat
                                              model="zen"),
     )
     assert seen_models == ["zen"]
+
+
+@pytest.mark.asyncio
+async def test_delete_asset_image_keeps_the_other_version(ctx):
+    brief = await h.create_media_brief(ctx, CreateMediaBriefParams(article_title="T", inline_count=0))
+    stored = await h.st.get_package(ctx, brief.data.id)
+    asset = stored["assets"][0]
+    asset.update({
+        "status": "ready",
+        "image_url": "https://storage.example/upscaled.png",
+        "original_image_url": "https://storage.example/original.png",
+        "original_storage_path": "media-studio/p/featured/original.png",
+        "original_dimensions": "1024 × 768 px",
+        "upscaled_image_url": "https://storage.example/upscaled.png",
+        "upscaled_storage_path": "media-studio/p/featured/upscaled.png",
+    })
+    await h.st.update_package(ctx, brief.data.id, {"assets": [asset]})
+
+    result = await h.delete_asset_image(ctx, DeleteAssetImageParams(
+        package_id=brief.data.id, role="featured", version="upscaled",
+    ))
+    assert result.status == "success"
+    updated = await h.st.get_package(ctx, brief.data.id)
+    remaining = updated["assets"][0]
+    assert remaining["original_image_url"] == "https://storage.example/original.png"
+    assert remaining["upscaled_image_url"] == ""
+    assert remaining["image_url"] == "https://storage.example/original.png"
 
 
 @pytest.mark.asyncio

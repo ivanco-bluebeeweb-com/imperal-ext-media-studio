@@ -287,6 +287,10 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
                 ) if part) or "Size, format and file weight unavailable",
                 variant="caption",
             ),
+            ui.Button(
+                "Delete", variant="ghost", size="sm",
+                on_click=ui.Call("delete_asset_image", package_id=package_id, role=role, version="original"),
+            ),
         ])
         if asset.get("upscaled_image_url"):
             image_children.extend([
@@ -298,6 +302,10 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
                         asset.get("upscaled_file_size", ""),
                     ) if part) or "Size, format and file weight unavailable",
                     variant="caption",
+                ),
+                ui.Button(
+                    "Delete", variant="ghost", size="sm",
+                    on_click=ui.Call("delete_asset_image", package_id=package_id, role=role, version="upscaled"),
                 ),
             ])
     elif url_expired:
@@ -370,7 +378,7 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     role_title = (role or "image").replace("_", " ").title()
     image_children.insert(0, ui.Row(
         children=[
-            ui.Text(f"{role_title} Image", variant="label"),
+            ui.Header(f"{role_title} Image", level=2),
             _status_badge(status),
         ],
         gap=2,

@@ -31,6 +31,40 @@ def _png(width: int, height: int) -> bytes:
 
 
 @pytest.mark.asyncio
+async def test_generated_image_is_copied_to_permanent_storage(monkeypatch):
+    ctx = _Ctx()
+
+    class _Stored:
+        url = "https://storage.imperal.example/media/featured/original.png"
+
+    class _Storage:
+        async def upload(self, path, data, content_type="application/octet-stream"):
+            assert path.endswith("/featured/original.png")
+            assert content_type == "image/png"
+            return _Stored()
+
+    ctx.storage = _Storage()
+
+    async def fake_download(url):
+        assert url == "https://cdn.example/original.png?temporary-token"
+        return _png(2048, 1536)
+
+    monkeypatch.setattr(h.mc, "download_image_bytes", fake_download)
+
+    result = await h._maybe_upscale_asset_image(
+        ctx,
+        "key",
+        "https://cdn.example/original.png?temporary-token",
+        package_id="pkg-1",
+        role="featured",
+    )
+
+    assert result["original_image_url"] == _Stored.url
+    assert result["image_url"] == _Stored.url
+    assert result["original_storage_path"] == "media-studio/pkg-1/featured/original.png"
+
+
+@pytest.mark.asyncio
 async def test_small_image_is_auto_upscaled(monkeypatch):
     ctx = _Ctx()
     calls = {}

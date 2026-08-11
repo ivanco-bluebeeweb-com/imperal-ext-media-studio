@@ -151,6 +151,14 @@ class UpdateAssetMetaParams(BaseModel):
     caption: str = Field("", description="New caption. Omit to keep unchanged.")
 
 
+class DeleteAssetImageParams(BaseModel):
+    package_id: str = Field("", description="The media package id.")
+    role: str = Field("", description="Which asset owns the image, e.g. 'featured'.")
+    version: str = Field(
+        "original", description="Stored image to delete: 'original' or 'upscaled'."
+    )
+
+
 class DeleteMediaPackageParams(BaseModel):
     package_id: str = Field("", description="The media package id to delete.")
 
@@ -179,12 +187,14 @@ class MediaAsset(sdl.Entity):
     provider: str = ""          # "magnific" (first and, for now, only backend)
     provider_task_id: str = ""
     model: str = ""              # Mystic model used, "" = provider default
-    image_url: str = ""          # final image: original when no upscale ran, otherwise upscaled
-    original_image_url: str = "" # provider output before optional auto-upscale
+    image_url: str = ""          # final permanent stored image: original or latest upscale
+    original_image_url: str = "" # permanent stored original image
+    original_storage_path: str = "" # Imperal Storage object path for Delete
     original_dimensions: str = ""# verified `WIDTH × HEIGHT px`, never guessed from a URL
     original_format: str = ""    # verified PNG/JPEG/WebP format
     original_file_size: str = "" # verified human-readable byte count
-    upscaled_image_url: str = "" # result from Upscaler Creative; empty when no upscale ran
+    upscaled_image_url: str = "" # permanent stored upscale; empty when no upscale ran
+    upscaled_storage_path: str = "" # Imperal Storage object path for Delete
     upscaled_dimensions: str = ""# verified `WIDTH × HEIGHT px`
     upscaled_format: str = ""    # verified PNG/JPEG/WebP format
     upscaled_file_size: str = "" # verified human-readable byte count

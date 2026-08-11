@@ -191,6 +191,11 @@
                 "title": "Original Image Url",
                 "type": "string"
               },
+              "original_storage_path": {
+                "default": "",
+                "title": "Original Storage Path",
+                "type": "string"
+              },
               "original_dimensions": {
                 "default": "",
                 "title": "Original Dimensions",
@@ -209,6 +214,11 @@
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_storage_path": {
+                "default": "",
+                "title": "Upscaled Storage Path",
                 "type": "string"
               },
               "upscaled_dimensions": {
@@ -528,6 +538,11 @@
                 "title": "Original Image Url",
                 "type": "string"
               },
+              "original_storage_path": {
+                "default": "",
+                "title": "Original Storage Path",
+                "type": "string"
+              },
               "original_dimensions": {
                 "default": "",
                 "title": "Original Dimensions",
@@ -546,6 +561,11 @@
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_storage_path": {
+                "default": "",
+                "title": "Upscaled Storage Path",
                 "type": "string"
               },
               "upscaled_dimensions": {
@@ -876,6 +896,11 @@
                 "title": "Original Image Url",
                 "type": "string"
               },
+              "original_storage_path": {
+                "default": "",
+                "title": "Original Storage Path",
+                "type": "string"
+              },
               "original_dimensions": {
                 "default": "",
                 "title": "Original Dimensions",
@@ -894,6 +919,11 @@
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_storage_path": {
+                "default": "",
+                "title": "Upscaled Storage Path",
                 "type": "string"
               },
               "upscaled_dimensions": {
@@ -1211,6 +1241,11 @@
                 "title": "Original Image Url",
                 "type": "string"
               },
+              "original_storage_path": {
+                "default": "",
+                "title": "Original Storage Path",
+                "type": "string"
+              },
               "original_dimensions": {
                 "default": "",
                 "title": "Original Dimensions",
@@ -1229,6 +1264,11 @@
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_storage_path": {
+                "default": "",
+                "title": "Upscaled Storage Path",
                 "type": "string"
               },
               "upscaled_dimensions": {
@@ -1564,6 +1604,11 @@
             "title": "Original Image Url",
             "type": "string"
           },
+          "original_storage_path": {
+            "default": "",
+            "title": "Original Storage Path",
+            "type": "string"
+          },
           "original_dimensions": {
             "default": "",
             "title": "Original Dimensions",
@@ -1582,6 +1627,11 @@
           "upscaled_image_url": {
             "default": "",
             "title": "Upscaled Image Url",
+            "type": "string"
+          },
+          "upscaled_storage_path": {
+            "default": "",
+            "title": "Upscaled Storage Path",
             "type": "string"
           },
           "upscaled_dimensions": {
@@ -1771,6 +1821,11 @@
             "title": "Original Image Url",
             "type": "string"
           },
+          "original_storage_path": {
+            "default": "",
+            "title": "Original Storage Path",
+            "type": "string"
+          },
           "original_dimensions": {
             "default": "",
             "title": "Original Dimensions",
@@ -1789,6 +1844,11 @@
           "upscaled_image_url": {
             "default": "",
             "title": "Upscaled Image Url",
+            "type": "string"
+          },
+          "upscaled_storage_path": {
+            "default": "",
+            "title": "Upscaled Storage Path",
             "type": "string"
           },
           "upscaled_dimensions": {
@@ -1843,6 +1903,223 @@
       "event": "media-studio.generate_asset_upscale",
       "background": true,
       "long_running": true,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "delete_asset_image",
+      "description": "Delete one stored image version from a media package. Choose original or upscaled; the other version and its metadata stay intact.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "package_id": {
+            "default": "",
+            "description": "The media package id.",
+            "title": "Package Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "description": "Which asset owns the image, e.g. 'featured'.",
+            "title": "Role",
+            "type": "string"
+          },
+          "version": {
+            "default": "original",
+            "description": "Stored image to delete: 'original' or 'upscaled'.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "title": "DeleteAssetImageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One image within a package -- featured or one of the inline slots.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
+            "type": "string"
+          },
+          "provider": {
+            "default": "",
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_task_id": {
+            "default": "",
+            "title": "Provider Task Id",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "image_url": {
+            "default": "",
+            "title": "Image Url",
+            "type": "string"
+          },
+          "original_image_url": {
+            "default": "",
+            "title": "Original Image Url",
+            "type": "string"
+          },
+          "original_storage_path": {
+            "default": "",
+            "title": "Original Storage Path",
+            "type": "string"
+          },
+          "original_dimensions": {
+            "default": "",
+            "title": "Original Dimensions",
+            "type": "string"
+          },
+          "original_format": {
+            "default": "",
+            "title": "Original Format",
+            "type": "string"
+          },
+          "original_file_size": {
+            "default": "",
+            "title": "Original File Size",
+            "type": "string"
+          },
+          "upscaled_image_url": {
+            "default": "",
+            "title": "Upscaled Image Url",
+            "type": "string"
+          },
+          "upscaled_storage_path": {
+            "default": "",
+            "title": "Upscaled Storage Path",
+            "type": "string"
+          },
+          "upscaled_dimensions": {
+            "default": "",
+            "title": "Upscaled Dimensions",
+            "type": "string"
+          },
+          "upscaled_format": {
+            "default": "",
+            "title": "Upscaled Format",
+            "type": "string"
+          },
+          "upscaled_file_size": {
+            "default": "",
+            "title": "Upscaled File Size",
+            "type": "string"
+          },
+          "filename": {
+            "default": "",
+            "title": "Filename",
+            "type": "string"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "alt_text": {
+            "default": "",
+            "title": "Alt Text",
+            "type": "string"
+          },
+          "caption": {
+            "default": "",
+            "title": "Caption",
+            "type": "string"
+          },
+          "error_message": {
+            "default": "",
+            "title": "Error Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaAsset",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.delete_asset_image",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "media-studio"
     },
@@ -1996,6 +2273,11 @@
             "title": "Original Image Url",
             "type": "string"
           },
+          "original_storage_path": {
+            "default": "",
+            "title": "Original Storage Path",
+            "type": "string"
+          },
           "original_dimensions": {
             "default": "",
             "title": "Original Dimensions",
@@ -2014,6 +2296,11 @@
           "upscaled_image_url": {
             "default": "",
             "title": "Upscaled Image Url",
+            "type": "string"
+          },
+          "upscaled_storage_path": {
+            "default": "",
+            "title": "Upscaled Storage Path",
             "type": "string"
           },
           "upscaled_dimensions": {

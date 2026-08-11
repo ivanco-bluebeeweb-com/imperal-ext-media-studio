@@ -35,6 +35,7 @@ def test_asset_card_labels_original_upscaled_and_metadata_clearly():
         "2048 × 1536 px",
         "512.0 KB",
         "2.0 MB",
+        "Delete",
         "Upscaling",
         "Metadata",
         "Regenerate",
@@ -54,6 +55,7 @@ def test_asset_card_labels_original_upscaled_and_metadata_clearly():
     ):
         assert label in rendered
     assert rendered.count("Featured Image") == 1
+    assert rendered.count("Delete") == 2
     assert "ready" in rendered.lower()
     assert rendered.index("Upscaling") < rendered.index("Metadata") < rendered.index("Regenerate")
     # Both URLs must remain present: the original is not silently discarded.
