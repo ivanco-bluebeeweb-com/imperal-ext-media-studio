@@ -823,8 +823,8 @@ async def recover_stored_images(ctx, params: RecoverStoredImagesParams) -> Actio
     ]
     if not legacy_assets:
         return ActionResult.success(
-            MediaPackage(),
-            "Every ready Media Hub image is already stored permanently, or has no expired provider link to restore.",
+            MediaPackage(id="recovery", title="Image recovery"),
+            "Every ready Media Hub image is already stored permanently, or has no provider link to restore.",
         )
 
     try:
@@ -883,7 +883,7 @@ async def recover_stored_images(ctx, params: RecoverStoredImagesParams) -> Actio
             f" {unavailable} image(s) could not be restored because Magnific did not return "
             "the exact original creation; they were left unchanged."
         )
-    return ActionResult.success(MediaPackage(), summary)
+    return ActionResult.success(MediaPackage(id="recovery", title="Image recovery"), summary)
 
 
 @chat.function(
