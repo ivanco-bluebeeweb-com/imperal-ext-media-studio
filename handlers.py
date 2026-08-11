@@ -851,7 +851,9 @@ async def recover_stored_images(ctx, params: RecoverStoredImagesParams) -> Actio
             source_url = ""
             for task_id in recovery.task_ids_from_asset(asset):
                 try:
-                    source_url = await recovery.get_mystic_task_image_url(ctx, api_key, task_id)
+                    source_url = await recovery.get_provider_task_image_url(
+                        ctx, api_key, asset.get("model", ""), task_id,
+                    )
                 except mc.ProviderError:
                     # Older providers may not expose a Mystic task. Fall back
                     # to the identity-proven Creations API record below.

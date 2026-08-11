@@ -71,13 +71,24 @@ def _creation_urls(record: dict) -> list[str]:
     return list(dict.fromkeys(urls))
 
 
-async def get_mystic_task_image_url(ctx, api_key: str, task_id: str) -> str:
-    """Read one historic Mystic task and return its sole generated image URL.
+_TASK_PATHS = {
+    "mystic": mc.CREATE_PATH,
+    "imagen4-fast": "/v1/ai/text-to-image/imagen4-fast",
+    "imagen4-ultra": "/v1/ai/text-to-image/imagen4-ultra",
+}
 
-    The task id is the UUID kept in legacy Media Hub URLs.  The endpoint is
-    Magnific's documented `GET /v1/ai/mystic/{task-id}` status endpoint.
+
+async def get_provider_task_image_url(ctx, api_key: str, model: str, task_id: str) -> str:
+    """Read one historic task and return its sole source-image URL.
+
+    Model paths are restricted to the exact documented providers that issued
+    legacy Media Hub URLs. A task URL is copied only after that task itself
+    reports one completed output -- never by a visual or prompt guess.
     """
-    result = await mc.get_mystic_task(ctx, api_key, task_id)
+    path = _TASK_PATHS.get(model)
+    if not path:
+        return ""
+    result = await mc.get_model_task(ctx, api_key, path, task_id)
     if result.get("state") != "done":
         return ""
     urls = list(dict.fromkeys(result.get("image_urls", [])))

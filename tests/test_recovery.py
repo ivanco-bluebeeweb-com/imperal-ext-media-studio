@@ -50,25 +50,27 @@ def test_ambiguous_multiple_source_urls_are_never_matched():
 
 
 @pytest.mark.asyncio
-async def test_historic_mystic_task_returns_its_single_image_url(monkeypatch, ctx):
-    async def fake_task(_ctx, _api_key, task_id):
+async def test_historic_imagen_task_returns_its_single_image_url(monkeypatch, ctx):
+    async def fake_task(_ctx, _api_key, model_path, task_id):
+        assert model_path == "/v1/ai/text-to-image/imagen4-ultra"
         assert task_id == "f992763b-cdaa-474c-8329-2ed967529295"
         return {"state": "done", "image_urls": ["https://cdn.example/exact-image.png"]}
 
-    monkeypatch.setattr(recovery.mc, "get_mystic_task", fake_task)
+    monkeypatch.setattr(recovery.mc, "get_model_task", fake_task)
 
-    assert await recovery.get_mystic_task_image_url(
-        ctx, "key", "f992763b-cdaa-474c-8329-2ed967529295",
+    assert await recovery.get_provider_task_image_url(
+        ctx, "key", "imagen4-ultra", "f992763b-cdaa-474c-8329-2ed967529295",
     ) == "https://cdn.example/exact-image.png"
 
 
 @pytest.mark.asyncio
-async def test_historic_mystic_task_refuses_nonfinal_or_ambiguous_results(monkeypatch, ctx):
-    async def pending_task(_ctx, _api_key, _task_id):
+async def test_historic_task_refuses_unknown_model_or_nonfinal_result(monkeypatch, ctx):
+    async def pending_task(_ctx, _api_key, _model_path, _task_id):
         return {"state": "pending", "image_urls": []}
 
-    monkeypatch.setattr(recovery.mc, "get_mystic_task", pending_task)
-    assert await recovery.get_mystic_task_image_url(ctx, "key", "task") == ""
+    monkeypatch.setattr(recovery.mc, "get_model_task", pending_task)
+    assert await recovery.get_provider_task_image_url(ctx, "key", "imagen4-fast", "task") == ""
+    assert await recovery.get_provider_task_image_url(ctx, "key", "unknown", "task") == ""
 
 
 @pytest.mark.asyncio

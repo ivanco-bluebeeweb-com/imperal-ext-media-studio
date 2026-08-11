@@ -145,10 +145,10 @@ async def create_mystic_job(
     return task_id
 
 
-async def get_mystic_task(ctx, api_key: str, task_id: str) -> dict:
-    """GET /v1/ai/mystic/{task_id} -- returns a normalized status dict."""
+async def get_model_task(ctx, api_key: str, model_path: str, task_id: str) -> dict:
+    """Read one task from a documented Magnific model endpoint."""
     resp = await ctx.http.get(
-        f"{BASE_URL}{STATUS_PATH.format(task_id=task_id)}",
+        f"{BASE_URL}{model_path}/{task_id}",
         headers=_headers(api_key),
         timeout=30,
     )
@@ -170,6 +170,11 @@ async def get_mystic_task(ctx, api_key: str, task_id: str) -> dict:
     if status in FAILED_STATUSES:
         return {"state": "failed", "image_urls": [], "raw_status": status}
     return {"state": "pending", "image_urls": [], "raw_status": status or "unknown"}
+
+
+async def get_mystic_task(ctx, api_key: str, task_id: str) -> dict:
+    """GET /v1/ai/mystic/{task_id} -- normalized historic Mystic task status."""
+    return await get_model_task(ctx, api_key, CREATE_PATH, task_id)
 
 
 async def generate_image(
