@@ -43,6 +43,7 @@ from models import (
     DeleteMediaPackageParams,
     DeleteResult,
     GenerateMediaPackageParams,
+    GenerateAssetUpscaleParams,
     GetMediaPackageParams,
     ListMediaPackagesParams,
     MediaAsset,
@@ -637,6 +638,85 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
                    provider=target.get("provider", "magnific"), model=target.get("model", ""),
                    status="generating"),
         f"Regenerating '{params.role}'. I'll message you when it's ready.",
+    )
+
+
+@chat.function(
+    "generate_asset_upscale",
+    "Create a larger version of one generated image with Magnific Creative Upscaler. "
+    "Choose one of Magnific's supported scale factors, then retrieve the updated asset.",
+    action_type="write",
+    background=True,
+    long_running=True,
+    data_model=MediaAsset,
+    event="media-studio.generate_asset_upscale",
+    effects=["update:media_package"],
+)
+async def generate_asset_upscale(ctx, params: GenerateAssetUpscaleParams) -> ActionResult:
+    """Upscale one asset from its preserved original provider image.
+
+    Manual upscale never replaces the original source URL. It only updates the
+    separate `upscaled_*` fields and points `image_url` at the newest output,
+    allowing the card to show an honest original-versus-upscaled pair.
+    """
+    row = await st.get_package(ctx, params.package_id)
+    if row is None:
+        return _error(f"No media package found with id '{params.package_id}'.", c.MEDIA_PACKAGE_NOT_FOUND)
+    assets = list(row.get("assets", []))
+    target = next((asset for asset in assets if asset.get("role") == params.role), None)
+    if target is None:
+        return _error(
+            f"No asset '{params.role}' in package '{params.package_id}'.", c.MEDIA_ASSET_NOT_FOUND,
+        )
+
+    scale_factor = params.scale_factor.strip().lower()
+    if scale_factor not in mc.available_upscale_scale_factors():
+        choices = ", ".join(mc.available_upscale_scale_factors())
+        return _error(f"Magnific supports these upscale values: {choices}.", c.MEDIA_PROVIDER_ERROR)
+
+    original_url = target.get("original_image_url") or target.get("image_url", "")
+    if not original_url:
+        return _error("Generate this image before creating a larger version.", c.MEDIA_ASSET_NOT_FOUND)
+    if is_image_url_expired(original_url):
+        return _error("This image link has expired. Regenerate the image first, then upscale it.", c.MEDIA_PROVIDER_ERROR)
+
+    api_key = await ctx.secrets.get("magnific_api_key")
+    if not api_key:
+        return _error("No Magnific API key connected yet. Open Media Hub settings and paste your Magnific API key first.", c.MEDIA_KEY_NOT_CONFIGURED)
+
+    async def work() -> ActionResult:
+        try:
+            await ctx.progress(10, "Preparing image for upscale...")
+            original_bytes = await mc.download_image_bytes(original_url)
+            await ctx.progress(30, f"Creating {scale_factor} upscale...")
+            upscaled_url = await mc.upscale_image(ctx, api_key, original_bytes, scale_factor)
+            upscaled_bytes = await mc.download_image_bytes(upscaled_url)
+            upscaled_format, upscaled_dimensions = image_dims.describe_image(upscaled_bytes)
+            original_format, original_dimensions = image_dims.describe_image(original_bytes)
+            target.update(
+                image_url=upscaled_url,
+                original_image_url=original_url,
+                original_format=target.get("original_format") or original_format,
+                original_dimensions=target.get("original_dimensions") or original_dimensions,
+                upscaled_image_url=upscaled_url,
+                upscaled_format=upscaled_format,
+                upscaled_dimensions=upscaled_dimensions,
+            )
+            current = await st.update_package(ctx, params.package_id, {"assets": assets})
+            refreshed = next((asset for asset in current.get("assets", []) if asset.get("role") == params.role), target)
+            return ActionResult.success(_package_to_entity({**row, "assets": [refreshed]}).assets[0], f"Created a {scale_factor} upscaled version of '{params.role}'.")
+        except mc.ProviderError as exc:
+            return _error(f"Could not upscale '{params.role}': {exc}", c.MEDIA_PROVIDER_ERROR)
+
+    coro = work()
+    try:
+        await ctx.background_task(coro, long_running=True, name="media-studio-upscale")
+    except (RuntimeError, AttributeError) as exc:
+        await ctx.log(f"generate_asset_upscale: no background spawn hook ({exc}); running synchronously", level="warning")
+        return await coro
+    return ActionResult.success(
+        MediaAsset(id=target.get("role", ""), title=_asset_title(target.get("role", "")), role=target.get("role", ""), status="generating"),
+        f"Creating a {scale_factor} upscaled version of '{params.role}'. I'll message you when it's ready.",
     )
 
 

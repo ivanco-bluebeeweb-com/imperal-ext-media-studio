@@ -39,6 +39,7 @@ from imperal_sdk import ui
 
 from app import ext
 import model_discovery as md
+import magnific_client as mc
 import storage as st
 import model_registry as mr
 from providers import list_provider_connections
@@ -332,6 +333,31 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
         ))
     else:
         body_children.append(ui.Text("Not generated yet.", variant="caption"))
+
+    # A manual upscale is intentionally an explicit, small action. The source
+    # image remains in the card above; this form only makes a new larger copy.
+    if original_url and not url_expired:
+        body_children.append(ui.Section(
+            title="Upscale Image",
+            children=[
+                ui.Form(
+                    action="generate_asset_upscale",
+                    submit_label="Generate Upscale",
+                    defaults={"package_id": package_id, "role": role},
+                    children=[
+                        ui.Text("Increase size", variant="label"),
+                        ui.Select(
+                            param_name="scale_factor",
+                            options=[
+                                {"value": factor, "label": factor}
+                                for factor in mc.available_upscale_scale_factors()
+                            ],
+                            value="2x",
+                        ),
+                    ],
+                ),
+            ],
+        ))
 
     # Clear labels matter more than clever placeholders here: this is the
     # publish-ready metadata a non-technical editor needs to understand.

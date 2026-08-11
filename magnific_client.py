@@ -48,6 +48,12 @@ UPSCALE_SCALE_FACTORS = (2, 4, 8, 16)
 UPSCALE_MAX_OUTPUT_PIXELS = 25_300_000
 STATUS_PATH = "/v1/ai/mystic/{task_id}"
 
+
+def available_upscale_scale_factors() -> tuple[str, ...]:
+    """Magnific Creative Upscaler's documented `scale_factor` enum, formatted
+    for forms and API validation from the same canonical client constant."""
+    return tuple(f"{factor}x" for factor in UPSCALE_SCALE_FACTORS)
+
 # Statuses observed/documented across Magnific's async task endpoints
 # (Mystic, Upscaler, video) all follow the same lifecycle vocabulary.
 DONE_STATUSES = {"completed", "done", "success", "succeeded"}

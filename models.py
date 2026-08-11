@@ -132,6 +132,14 @@ class RegenerateAssetParams(BaseModel):
                         "to reuse the package's model (or Mystic's default).")
 
 
+class GenerateAssetUpscaleParams(BaseModel):
+    package_id: str = Field("", description="The media package that owns the image.")
+    role: str = Field("", description="Which asset to upscale, e.g. 'featured'.")
+    scale_factor: str = Field(
+        "2x", description="Magnific Creative Upscaler scale factor: 2x, 4x, 8x, or 16x."
+    )
+
+
 class UpdateAssetMetaParams(BaseModel):
     package_id: str = Field("", description="The media package id.")
     role: str = Field("", description="Which asset to edit, e.g. 'featured'.")
