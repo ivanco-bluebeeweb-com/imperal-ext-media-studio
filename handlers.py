@@ -828,7 +828,7 @@ async def recover_stored_images(ctx, params: RecoverStoredImagesParams) -> Actio
         )
 
     try:
-        creation_urls = await recovery.list_recent_creation_urls(ctx, api_key)
+        creations = await recovery.list_recent_creations(ctx, api_key)
     except mc.ProviderError as exc:
         return _error(f"Could not look up existing Magnific creations: {exc}", c.MEDIA_PROVIDER_ERROR)
 
@@ -836,7 +836,7 @@ async def recover_stored_images(ctx, params: RecoverStoredImagesParams) -> Actio
     unavailable = 0
     for row in rows:
         assets = list(row.get("assets", []))
-        matches = recovery.match_creation_urls(assets, creation_urls)
+        matches = recovery.match_creation_urls(assets, creations)
         changed = False
         for asset in assets:
             role = asset.get("role", "")

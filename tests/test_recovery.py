@@ -7,43 +7,50 @@ import pytest
 import recovery
 
 
-def test_exact_filename_match_ignores_expiring_query_token():
-    assets = [{
-        "role": "featured",
-        "image_url": "https://cdn-magnific.freepik.com/result_ABC.png?token=exp=1~hmac=old",
-    }]
-    urls = ["https://cdn.freepik.com/creations/result_ABC.png?fresh=yes"]
-
-    assert recovery.match_creation_urls(assets, urls) == {
-        "featured": "https://cdn.freepik.com/creations/result_ABC.png?fresh=yes",
+def _creation(reference: str, url: str) -> dict:
+    return {
+        "reference": reference,
+        "external_id": "8421",
+        "creation": {"id": 8421, "identifier": "a1b2c3d4", "url": url},
     }
 
 
-def test_ambiguous_filename_is_never_matched():
-    assets = [{"role": "featured", "image_url": "https://cdn.example/result_ABC.png?token=old"}]
-    urls = [
-        "https://cdn.example/a/result_ABC.png?fresh=1",
-        "https://cdn.example/b/result_ABC.png?fresh=2",
+def test_exact_creation_reference_match_restores_source_url():
+    reference = "f992763b-cdaa-474c-8329-2ed967529295"
+    assets = [{
+        "role": "featured",
+        "image_url": f"https://cdn-magnific.freepik.com/result_IMAGEN4_{reference}_0.png?token=expired",
+    }]
+    creations = [_creation(reference, "https://cdn.freepik.com/creations/8421.png")]
+
+    assert recovery.match_creation_urls(assets, creations) == {
+        "featured": "https://cdn.freepik.com/creations/8421.png",
+    }
+
+
+def test_unrelated_creation_is_never_matched():
+    assets = [{
+        "role": "featured",
+        "image_url": "https://cdn.example/result_f992763b-cdaa-474c-8329-2ed967529295.png?token=old",
+    }]
+    creations = [_creation("9ed2a4cf-35a7-4e43-a6de-7e4d5366d858", "https://cdn.example/other.png")]
+
+    assert recovery.match_creation_urls(assets, creations) == {}
+
+
+def test_ambiguous_multiple_source_urls_are_never_matched():
+    reference = "f992763b-cdaa-474c-8329-2ed967529295"
+    assets = [{"role": "featured", "image_url": f"https://cdn.example/{reference}.png"}]
+    creations = [
+        _creation(reference, "https://cdn.example/first.png"),
+        _creation(reference, "https://cdn.example/second.png"),
     ]
 
-    assert recovery.match_creation_urls(assets, urls) == {}
-
-
-def test_task_id_requires_a_matching_provider_identifier():
-    assets = [{
-        "role": "featured",
-        "provider_task_id": "task-12345678",
-        "image_url": "https://cdn.example/result_ABC.png?token=old",
-    }]
-    urls = ["https://cdn.example/task-12345678/result_ABC.png?fresh=1"]
-
-    assert recovery.match_creation_urls(assets, urls) == {
-        "featured": "https://cdn.example/task-12345678/result_ABC.png?fresh=1",
-    }
+    assert recovery.match_creation_urls(assets, creations) == {}
 
 
 @pytest.mark.asyncio
-async def test_recent_creations_paginates_and_deduplicates(ctx):
+async def test_recent_creations_paginates_and_keeps_records(ctx):
     calls: list[dict] = []
 
     class Response:
@@ -55,14 +62,15 @@ async def test_recent_creations_paginates_and_deduplicates(ctx):
         def json(self):
             return {"data": self._records}
 
+    first = _creation("one-reference", "https://cdn.example/one.png")
+    second = _creation("two-reference", "https://cdn.example/two.png")
+
     async def fake_get(url, *, headers, params, timeout):
         calls.append(params)
-        if params["page"] == 1:
-            return Response([{"creation": {"url": "https://cdn.example/one.png"}}] * 100)
-        return Response([{"creation": {"url": "https://cdn.example/two.png"}}])
+        return Response([first] * 100 if params["page"] == 1 else [second])
 
     ctx.http.get = fake_get
-    urls = await recovery.list_recent_creation_urls(ctx, "key")
+    records = await recovery.list_recent_creations(ctx, "key")
 
-    assert urls == ["https://cdn.example/one.png", "https://cdn.example/two.png"]
+    assert records == [first] * 100 + [second]
     assert [call["page"] for call in calls] == [1, 2]
