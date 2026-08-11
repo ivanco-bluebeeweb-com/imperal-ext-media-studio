@@ -108,6 +108,12 @@ async def _generate_asset_image(ctx, api_key: str, asset: dict, *, on_progress=N
         )
     spec = mr.get_model(model)
     try:
+        # "sync_base64" models (currently only Classic Fast) answer in ONE
+        # call with raw image bytes -- there is no task to create-then-poll,
+        # so they get their own client function instead of being forced
+        # through generate_image_with_model's create+poll shape.
+        if spec.response_kind == "sync_base64":
+            return await mc.create_sync_image(ctx, api_key, spec, asset["prompt"])
         return await mc.generate_image_with_model(
             ctx, api_key, asset["prompt"], spec, on_progress=on_progress,
         )

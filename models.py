@@ -143,6 +143,16 @@ class DeleteMediaPackageParams(BaseModel):
     package_id: str = Field("", description="The media package id to delete.")
 
 
+class CheckNewModelsParams(BaseModel):
+    """No inputs -- this always checks the one known source (Magnific's
+    own sitemap) against the one known registry (model_registry.MODELS)."""
+    pass
+
+
+class ListModelDiscoveryLogParams(BaseModel):
+    limit: int = Field(30, ge=1, le=100)
+
+
 # --------------------------- SDL entities ---------------------------
 
 class DeleteResult(sdl.Entity):
@@ -181,3 +191,29 @@ class MediaPackage(sdl.Entity):
     assets: list[MediaAsset] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
+
+
+class ModelDiscoveryFinding(sdl.Entity):
+    """One docs page the sitemap has that model_registry.MODELS doesn't --
+    a candidate model, NOT yet a usable one (see model_discovery.py for why
+    this never becomes a ModelSpec by itself)."""
+    slug: str = ""
+    docs_url: str = ""
+
+
+class ModelDiscoveryResult(sdl.Entity):
+    """Outcome of one daily/manual check run."""
+    checked_at: str = ""
+    source_reachable: bool = False
+    known_model_count: int = 0
+    new_candidates: list[ModelDiscoveryFinding] = Field(default_factory=list)
+    note: str = ""
+
+
+class ModelDiscoveryLogEntry(sdl.Entity):
+    """One past check, for `list_model_discovery_log` -- always recorded,
+    even a run that reachably found nothing new."""
+    checked_at: str = ""
+    source_reachable: bool = False
+    new_candidate_slugs: list[str] = Field(default_factory=list)
+    note: str = ""

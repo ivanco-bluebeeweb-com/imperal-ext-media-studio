@@ -91,3 +91,107 @@ def test_pick_model_always_returns_a_registered_model():
     for role, prompt, style in prompts:
         picked = mr.pick_model(role, prompt, style)
         assert picked in mr.MODELS
+
+
+# ------------------- 2026-08-11 expansion: 14 new models -------------------
+# One test per model confirms the exact path AND the field shape actually
+# read off that model's own docs.magnific.com page -- not a guess. Grouped
+# by the aspect-ratio "family" each one belongs to (see model_registry.py's
+# module docstring), so a wrong constant would show up as a wrong value here.
+
+def test_nano_banana_pro_confirmed_path_and_colon_aspect_ratio():
+    spec = mr.MODELS["nano-banana-pro"]
+    assert spec.create_path == "/v1/ai/text-to-image/nano-banana-pro"
+    assert spec.status_path == "/v1/ai/text-to-image/nano-banana-pro/{task_id}"
+    body = spec.build_body("a warehouse")
+    assert body["aspect_ratio"] == "4:3"  # colon family, NOT classic_4_3
+
+
+def test_nano_banana_pro_flash_confirmed_path_and_colon_aspect_ratio():
+    spec = mr.MODELS["nano-banana-pro-flash"]
+    assert spec.create_path == "/v1/ai/text-to-image/nano-banana-pro-flash"
+    body = spec.build_body("a warehouse")
+    assert body["aspect_ratio"] == "4:3"
+
+
+def test_flux_dev_confirmed_path_and_square_1_1_family():
+    spec = mr.MODELS["flux-dev"]
+    assert spec.create_path == "/v1/ai/text-to-image/flux-dev"
+    assert spec.build_body("x")["aspect_ratio"] == "classic_4_3"
+
+
+def test_flux_pro_v1_1_confirmed_path():
+    spec = mr.MODELS["flux-pro-v1.1"]
+    assert spec.create_path == "/v1/ai/text-to-image/flux-pro-v1-1"
+    assert spec.build_body("x")["aspect_ratio"] == "classic_4_3"
+
+
+def test_flux_2_pro_and_turbo_use_pixel_width_height_not_aspect_ratio():
+    for model_id in ("flux-2-pro", "flux-2-turbo"):
+        body = mr.MODELS[model_id].build_body("x")
+        assert "aspect_ratio" not in body
+        assert body["width"] == 1024
+        assert body["height"] == 768
+
+
+def test_flux_2_flex_confirmed_path_and_pixel_dimensions():
+    spec = mr.MODELS["flux-2-flex"]
+    assert spec.create_path == "/v1/ai/text-to-image/flux-2-flex"
+    body = spec.build_body("x")
+    assert body["width"] == 1024 and body["height"] == 768
+
+
+def test_flux_2_klein_confirmed_path_and_square_1_1_family():
+    spec = mr.MODELS["flux-2-klein"]
+    assert spec.create_path == "/v1/ai/text-to-image/flux-2-klein"
+    assert spec.build_body("x")["aspect_ratio"] == "classic_4_3"
+
+
+def test_hyperflux_confirmed_path():
+    spec = mr.MODELS["hyperflux"]
+    assert spec.create_path == "/v1/ai/text-to-image/hyperflux"
+    assert spec.build_body("x")["aspect_ratio"] == "classic_4_3"
+
+
+def test_z_image_confirmed_path_and_named_image_size():
+    spec = mr.MODELS["z-image"]
+    assert spec.create_path == "/v1/ai/text-to-image/z-image"
+    assert spec.build_body("x")["image_size"] == "landscape_4_3"
+
+
+def test_seedream_family_confirmed_paths_and_square_1_1_family():
+    expected_paths = {
+        "seedream-4": "/v1/ai/text-to-image/seedream-v4",
+        "seedream-4.5": "/v1/ai/text-to-image/seedream-v4-5",
+        "seedream-v5-lite": "/v1/ai/text-to-image/seedream-v5-lite",
+        "seedream-v5-pro": "/v1/ai/text-to-image/seedream-v5-pro",
+    }
+    for model_id, path in expected_paths.items():
+        spec = mr.MODELS[model_id]
+        assert spec.create_path == path, f"{model_id} path mismatch"
+        assert spec.build_body("x")["aspect_ratio"] == "classic_4_3"
+
+
+def test_all_new_models_are_known_and_valid_choices():
+    new_ids = [
+        "nano-banana-pro", "nano-banana-pro-flash", "flux-dev",
+        "flux-pro-v1.1", "flux-2-pro", "flux-2-turbo", "flux-2-flex",
+        "flux-2-klein", "hyperflux", "z-image", "seedream-4",
+        "seedream-4.5", "seedream-v5-lite", "seedream-v5-pro",
+    ]
+    for model_id in new_ids:
+        assert mr.is_known_model(model_id), f"{model_id} not registered"
+
+
+def test_imagen3_deliberately_excluded_as_deprecated():
+    """Confirmed on docs.magnific.com: Imagen 3's own page says the
+    endpoint is deprecated and scheduled for removal -- must stay OUT."""
+    assert "imagen3" not in mr.MODELS
+
+
+def test_nano_banana_2_deliberately_excluded_no_confirmed_endpoint():
+    """The user's own web app shows \"Nano Banana 2\", but no
+    docs.magnific.com page for it exists (sitemap-checked) -- only
+    nano-banana-pro/-flash are confirmed, so \"nano-banana-2\" must stay
+    unregistered rather than guessed."""
+    assert "nano-banana-2" not in mr.MODELS

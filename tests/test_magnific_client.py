@@ -108,3 +108,62 @@ async def test_generate_image_calls_on_progress(ctx):
 
     await mc.generate_image(ctx, "key", "a cat", poll_interval_s=0, max_polls=3, on_progress=on_progress)
     assert seen == [(1, 3)]
+
+
+# --------------------------- sync_base64 path (Classic Fast) ---------------------------
+
+def _classic_fast_spec():
+    import model_registry as mr
+    return mr.MODELS["classic-fast"]
+
+
+@pytest.mark.asyncio
+async def test_create_sync_image_uploads_decoded_bytes_and_returns_url(ctx, monkeypatch):
+    import base64
+    raw = b"\x89PNG\r\n\x1a\nfake-bytes"
+    b64 = base64.b64encode(raw).decode()
+    ctx.http.mock_post("/v1/ai/text-to-image", {"data": [{"base64": b64, "has_nsfw": False}]})
+
+    # MockStorage (imperal_sdk.testing) never populates FileInfo.url -- only
+    # the REAL gateway does (it parses `url` out of the upload response, see
+    # StorageClient.upload). Patch just that one return value here so the
+    # test exercises the real "no url -> raise" guard against a REALISTIC
+    # success shape, not the mock's incomplete default.
+    from imperal_sdk.types.models import FileInfo
+    captured = {}
+    real_upload = ctx.storage.upload
+
+    async def fake_upload(path, data, content_type="application/octet-stream"):
+        captured["data"] = data
+        return FileInfo(path=path, size=len(data), content_type=content_type,
+                         url="https://cdn.example/uploaded.png")
+
+    monkeypatch.setattr(ctx.storage, "upload", fake_upload)
+
+    url = await mc.create_sync_image(ctx, "key", _classic_fast_spec(), "a cat")
+    assert url == "https://cdn.example/uploaded.png"
+    # The exact bytes actually reached storage -- proves no silent corruption
+    # in the base64 decode -> upload path.
+    assert captured["data"] == raw
+
+
+@pytest.mark.asyncio
+async def test_create_sync_image_401_raises_provider_error(ctx):
+    ctx.http.mock_post("/v1/ai/text-to-image", {"error": "unauthorized"}, status=401)
+    with pytest.raises(mc.ProviderError) as exc:
+        await mc.create_sync_image(ctx, "bad-key", _classic_fast_spec(), "a cat")
+    assert exc.value.code == "MEDIA_PROVIDER_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_create_sync_image_no_base64_raises(ctx):
+    ctx.http.mock_post("/v1/ai/text-to-image", {"data": [{"has_nsfw": False}]})
+    with pytest.raises(mc.ProviderError):
+        await mc.create_sync_image(ctx, "key", _classic_fast_spec(), "a cat")
+
+
+@pytest.mark.asyncio
+async def test_create_sync_image_bad_base64_raises(ctx):
+    ctx.http.mock_post("/v1/ai/text-to-image", {"data": [{"base64": "not-valid-base64!!"}]})
+    with pytest.raises(mc.ProviderError):
+        await mc.create_sync_image(ctx, "key", _classic_fast_spec(), "a cat")

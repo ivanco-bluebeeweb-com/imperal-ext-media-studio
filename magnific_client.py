@@ -259,6 +259,71 @@ async def get_job(ctx, api_key: str, spec, task_id: str) -> dict:
     return {"state": "pending", "image_urls": [], "raw_status": status or "unknown"}
 
 
+async def create_sync_image(ctx, api_key: str, spec, prompt: str) -> str:
+    """POST `spec.create_path` for a `response_kind == "sync_base64"` model
+    (currently only Classic Fast) and return a hosted image URL.
+
+    Confirmed via docs.magnific.com/api-reference/text-to-image/get-image-from-text:
+    this endpoint answers in ONE call with `{"data": [{"base64": "..."}]}` --
+    no task id, nothing to poll. Magnific gives us raw bytes, not a URL, so
+    this uploads them through `ctx.storage` (the same mechanism every other
+    model relies on Magnific's own CDN for) to produce a URL the rest of the
+    pipeline (alt text, WordPress upload, etc.) can treat identically.
+    """
+    import base64
+    import time
+    import uuid
+
+    resp = await ctx.http.post(
+        f"{BASE_URL}{spec.create_path}",
+        headers=_headers(api_key),
+        json=spec.build_body(prompt),
+        timeout=60,
+    )
+    if resp.status_code == 401:
+        raise ProviderError(
+            f"Magnific rejected the API key (401) for {spec.label}.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    if not (200 <= resp.status_code < 300):
+        raise ProviderError(
+            f"Magnific create-job call failed for {spec.label} "
+            f"(HTTP {resp.status_code}).",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    body = resp.json()
+    d = _unwrap(body)
+    items = d.get("data") if isinstance(d, dict) else None
+    b64 = None
+    if isinstance(items, list):
+        for item in items:
+            if isinstance(item, dict) and item.get("base64"):
+                b64 = item["base64"]
+                break
+    if not b64:
+        raise ProviderError(
+            f"Magnific accepted the {spec.label} request but returned no "
+            "image data.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    try:
+        raw = base64.b64decode(b64)
+    except Exception as exc:
+        raise ProviderError(
+            f"Magnific's {spec.label} response image data could not be "
+            f"decoded: {exc}.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    path = f"media-studio/{spec.id}-{uuid.uuid4().hex[:12]}-{int(time.time())}.png"
+    info = await ctx.storage.upload(path, raw, content_type="image/png")
+    if not info.url:
+        raise ProviderError(
+            f"Uploaded the {spec.label} image but storage returned no URL.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    return info.url
+
+
 async def generate_image_with_model(
     ctx,
     api_key: str,
@@ -272,7 +337,16 @@ async def generate_image_with_model(
     """Create + poll a job against ANY registered model (`spec` is a
     model_registry.ModelSpec). This is the multi-provider counterpart to
     `generate_image`, which stays Mystic-only for backward compatibility.
+
+    `response_kind == "sync_base64"` models (Classic Fast) skip polling
+    entirely -- there is no task id to poll -- and go through
+    `create_sync_image` instead.
     """
+    if getattr(spec, "response_kind", "async_url") == "sync_base64":
+        if on_progress:
+            await on_progress(1, 1)
+        return await create_sync_image(ctx, api_key, spec, prompt)
+
     task_id = await create_job(ctx, api_key, spec, prompt)
     for attempt in range(1, max_polls + 1):
         if on_progress:
