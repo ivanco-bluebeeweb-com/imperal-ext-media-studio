@@ -186,6 +186,36 @@
                 "title": "Image Url",
                 "type": "string"
               },
+              "original_image_url": {
+                "default": "",
+                "title": "Original Image Url",
+                "type": "string"
+              },
+              "original_dimensions": {
+                "default": "",
+                "title": "Original Dimensions",
+                "type": "string"
+              },
+              "original_format": {
+                "default": "",
+                "title": "Original Format",
+                "type": "string"
+              },
+              "upscaled_image_url": {
+                "default": "",
+                "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_dimensions": {
+                "default": "",
+                "title": "Upscaled Dimensions",
+                "type": "string"
+              },
+              "upscaled_format": {
+                "default": "",
+                "title": "Upscaled Format",
+                "type": "string"
+              },
               "filename": {
                 "default": "",
                 "title": "Filename",
@@ -481,6 +511,36 @@
               "image_url": {
                 "default": "",
                 "title": "Image Url",
+                "type": "string"
+              },
+              "original_image_url": {
+                "default": "",
+                "title": "Original Image Url",
+                "type": "string"
+              },
+              "original_dimensions": {
+                "default": "",
+                "title": "Original Dimensions",
+                "type": "string"
+              },
+              "original_format": {
+                "default": "",
+                "title": "Original Format",
+                "type": "string"
+              },
+              "upscaled_image_url": {
+                "default": "",
+                "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_dimensions": {
+                "default": "",
+                "title": "Upscaled Dimensions",
+                "type": "string"
+              },
+              "upscaled_format": {
+                "default": "",
+                "title": "Upscaled Format",
                 "type": "string"
               },
               "filename": {
@@ -791,6 +851,36 @@
                 "title": "Image Url",
                 "type": "string"
               },
+              "original_image_url": {
+                "default": "",
+                "title": "Original Image Url",
+                "type": "string"
+              },
+              "original_dimensions": {
+                "default": "",
+                "title": "Original Dimensions",
+                "type": "string"
+              },
+              "original_format": {
+                "default": "",
+                "title": "Original Format",
+                "type": "string"
+              },
+              "upscaled_image_url": {
+                "default": "",
+                "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_dimensions": {
+                "default": "",
+                "title": "Upscaled Dimensions",
+                "type": "string"
+              },
+              "upscaled_format": {
+                "default": "",
+                "title": "Upscaled Format",
+                "type": "string"
+              },
               "filename": {
                 "default": "",
                 "title": "Filename",
@@ -1084,6 +1174,36 @@
               "image_url": {
                 "default": "",
                 "title": "Image Url",
+                "type": "string"
+              },
+              "original_image_url": {
+                "default": "",
+                "title": "Original Image Url",
+                "type": "string"
+              },
+              "original_dimensions": {
+                "default": "",
+                "title": "Original Dimensions",
+                "type": "string"
+              },
+              "original_format": {
+                "default": "",
+                "title": "Original Format",
+                "type": "string"
+              },
+              "upscaled_image_url": {
+                "default": "",
+                "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_dimensions": {
+                "default": "",
+                "title": "Upscaled Dimensions",
+                "type": "string"
+              },
+              "upscaled_format": {
+                "default": "",
+                "title": "Upscaled Format",
                 "type": "string"
               },
               "filename": {
@@ -1399,6 +1519,36 @@
             "title": "Image Url",
             "type": "string"
           },
+          "original_image_url": {
+            "default": "",
+            "title": "Original Image Url",
+            "type": "string"
+          },
+          "original_dimensions": {
+            "default": "",
+            "title": "Original Dimensions",
+            "type": "string"
+          },
+          "original_format": {
+            "default": "",
+            "title": "Original Format",
+            "type": "string"
+          },
+          "upscaled_image_url": {
+            "default": "",
+            "title": "Upscaled Image Url",
+            "type": "string"
+          },
+          "upscaled_dimensions": {
+            "default": "",
+            "title": "Upscaled Dimensions",
+            "type": "string"
+          },
+          "upscaled_format": {
+            "default": "",
+            "title": "Upscaled Format",
+            "type": "string"
+          },
           "filename": {
             "default": "",
             "title": "Filename",
@@ -1570,6 +1720,36 @@
           "image_url": {
             "default": "",
             "title": "Image Url",
+            "type": "string"
+          },
+          "original_image_url": {
+            "default": "",
+            "title": "Original Image Url",
+            "type": "string"
+          },
+          "original_dimensions": {
+            "default": "",
+            "title": "Original Dimensions",
+            "type": "string"
+          },
+          "original_format": {
+            "default": "",
+            "title": "Original Format",
+            "type": "string"
+          },
+          "upscaled_image_url": {
+            "default": "",
+            "title": "Upscaled Image Url",
+            "type": "string"
+          },
+          "upscaled_dimensions": {
+            "default": "",
+            "title": "Upscaled Dimensions",
+            "type": "string"
+          },
+          "upscaled_format": {
+            "default": "",
+            "title": "Upscaled Format",
             "type": "string"
           },
           "filename": {

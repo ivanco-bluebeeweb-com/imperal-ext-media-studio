@@ -147,43 +147,67 @@ async def _generate_asset_image(ctx, api_key: str, asset: dict, *, on_progress=N
 # quietly keeping the original. So every failure path here logs a warning
 # and returns the ORIGINAL url unchanged; only a clean upscale success
 # replaces it.
-async def _maybe_upscale_asset_image(ctx, api_key: str, image_url: str) -> str:
-    """If `image_url` points to an image smaller than 1500px on its smaller
-    side, upscale it via Magnific's Upscaler Creative and return the new
-    URL. Otherwise (already big enough, size unreadable, or the upscale
-    call fails) return `image_url` unchanged."""
+async def _maybe_upscale_asset_image(ctx, api_key: str, image_url: str) -> dict:
+    """Inspect the original generated image and optionally auto-upscale it.
+
+    The returned metadata is deliberately persisted with the asset: the UI
+    must show both the untouched provider output and the final upscaled image
+    (where present), together with sizes and formats verified from their
+    bytes. No size or file type is inferred from a CDN URL.
+    """
+    result = {
+        "image_url": image_url,
+        "original_image_url": image_url,
+        "original_dimensions": "",
+        "original_format": "",
+        "upscaled_image_url": "",
+        "upscaled_dimensions": "",
+        "upscaled_format": "",
+    }
     if not image_url:
-        return image_url
+        return result
     try:
         original_bytes = await mc.download_image_bytes(image_url)
     except Exception:
         await ctx.log(
             "Could not download the generated image to check its size; "
-            "skipping auto-upscale for this asset.",
-            level="warning",
+            "skipping auto-upscale for this asset.", level="warning",
         )
-        return image_url
+        return result
+
     dims = image_dims.get_image_dimensions(original_bytes)
+    original_format, original_dimensions = image_dims.describe_image(original_bytes)
+    result["original_format"] = original_format
+    result["original_dimensions"] = original_dimensions
     if dims is None:
         await ctx.log(
             "Generated image isn't a recognized PNG/JPEG/WebP; skipping "
-            "auto-upscale for this asset.",
-            level="warning",
+            "auto-upscale for this asset.", level="warning",
         )
-        return image_url
+        return result
+
     width, height = dims
     scale_factor = mc.upscale_scale_factor_for(width, height, min_side=1500)
     if scale_factor is None:
-        return image_url
+        return result
     try:
-        return await mc.upscale_image(ctx, api_key, original_bytes, scale_factor)
-    except mc.ProviderError:
+        upscaled_url = await mc.upscale_image(ctx, api_key, original_bytes, scale_factor)
+        upscaled_bytes = await mc.download_image_bytes(upscaled_url)
+    except Exception:
         await ctx.log(
             f"Auto-upscale failed for a {width}x{height} image; keeping the "
-            f"original.",
-            level="warning",
+            f"original.", level="warning",
         )
-        return image_url
+        return result
+
+    upscaled_format, upscaled_dimensions = image_dims.describe_image(upscaled_bytes)
+    result.update(
+        image_url=upscaled_url,
+        upscaled_image_url=upscaled_url,
+        upscaled_format=upscaled_format,
+        upscaled_dimensions=upscaled_dimensions,
+    )
+    return result
 
 
 def _package_to_entity(row: dict) -> MediaPackage:
@@ -196,6 +220,12 @@ def _package_to_entity(row: dict) -> MediaPackage:
             model=a.get("model", ""),
             status=a.get("status", "pending"),
             image_url=a.get("image_url", ""),
+            original_image_url=a.get("original_image_url", ""),
+            original_dimensions=a.get("original_dimensions", ""),
+            original_format=a.get("original_format", ""),
+            upscaled_image_url=a.get("upscaled_image_url", ""),
+            upscaled_dimensions=a.get("upscaled_dimensions", ""),
+            upscaled_format=a.get("upscaled_format", ""),
             filename=a.get("filename", ""),
             alt_text=a.get("alt_text", ""),
             caption=a.get("caption", ""),
@@ -389,9 +419,8 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
                     (i / total) * 100,
                     f"Generating {asset.get('role', 'image')}...",
                 )
-                image_url = await _generate_asset_image(ctx, api_key, asset)
-                image_url = await _maybe_upscale_asset_image(ctx, api_key, image_url)
-                asset["image_url"] = image_url
+                generated_url = await _generate_asset_image(ctx, api_key, asset)
+                asset.update(await _maybe_upscale_asset_image(ctx, api_key, generated_url))
                 asset["status"] = "ready"
                 asset["error"] = ""
                 if not asset.get("alt_text"):
@@ -562,9 +591,8 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
 
     async def work() -> ActionResult:
         try:
-            image_url = await _generate_asset_image(ctx, api_key, target)
-            image_url = await _maybe_upscale_asset_image(ctx, api_key, image_url)
-            target["image_url"] = image_url
+            generated_url = await _generate_asset_image(ctx, api_key, target)
+            target.update(await _maybe_upscale_asset_image(ctx, api_key, generated_url))
             target["status"] = "ready"
             target["error"] = ""
         except mc.ProviderError as exc:

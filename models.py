@@ -167,7 +167,13 @@ class MediaAsset(sdl.Entity):
     provider: str = ""          # "magnific" (first and, for now, only backend)
     provider_task_id: str = ""
     model: str = ""              # Mystic model used, "" = provider default
-    image_url: str = ""
+    image_url: str = ""          # final image: original when no upscale ran, otherwise upscaled
+    original_image_url: str = "" # provider output before optional auto-upscale
+    original_dimensions: str = ""# verified `WIDTH × HEIGHT px`, never guessed from a URL
+    original_format: str = ""    # verified PNG/JPEG/WebP format
+    upscaled_image_url: str = "" # result from Upscaler Creative; empty when no upscale ran
+    upscaled_dimensions: str = ""# verified `WIDTH × HEIGHT px`
+    upscaled_format: str = ""    # verified PNG/JPEG/WebP format
     filename: str = ""           # SEO/AEO-optimized base filename (no extension) -- carried through to the site's upload so the LIVE file name is never the provider's raw generated id
     prompt: str = ""
     alt_text: str = ""

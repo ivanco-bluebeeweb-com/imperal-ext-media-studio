@@ -23,18 +23,45 @@ from __future__ import annotations
 import struct
 
 
+def image_format(data: bytes) -> str:
+    """Return the verified display format (PNG/JPEG/WebP), or an empty string
+    when the bytes do not have one of Media Hub's supported signatures."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "PNG"
+    if data.startswith(b"\xff\xd8"):
+        return "JPEG"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "WebP"
+    return ""
+
+
 def get_image_dimensions(data: bytes) -> tuple[int, int] | None:
     """Return (width, height) in pixels, or None if the format isn't one of
     PNG/JPEG/WebP or the header is truncated/malformed."""
-    if not data:
-        return None
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+    format_name = image_format(data)
+    if format_name == "PNG":
         return _png_dimensions(data)
-    if data.startswith(b"\xff\xd8"):
+    if format_name == "JPEG":
         return _jpeg_dimensions(data)
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+    if format_name == "WebP":
         return _webp_dimensions(data)
     return None
+
+def format_dimensions(dimensions: tuple[int, int] | None) -> str:
+    """Turn verified dimensions into the short card label, e.g. `1500 ×
+    2000 px`. Returns empty when parsing supplied no trustworthy size."""
+    if dimensions is None:
+        return ""
+    return f"{dimensions[0]} × {dimensions[1]} px"
+
+
+def describe_image(data: bytes) -> tuple[str, str]:
+    """Return `(format, dimension_label)` for one downloaded image."""
+    return image_format(data), format_dimensions(get_image_dimensions(data))
+
+
+# Binary parsers below intentionally do not use file extensions or content-type:
+# the downloaded bytes are the only reliable source for the card's labels.
 
 
 def _png_dimensions(data: bytes) -> tuple[int, int] | None:

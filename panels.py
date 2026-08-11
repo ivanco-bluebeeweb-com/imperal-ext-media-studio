@@ -274,11 +274,41 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
 
     url_expired = status == "ready" and is_image_url_expired(asset.get("image_url", ""))
 
-    if asset.get("image_url") and not url_expired:
-        body_children.append(ui.Image(
-            src=asset["image_url"], alt=asset.get("alt_text", ""),
-            width="100%", object_fit="cover",
-        ))
+    # Keep the original visible even after auto-upscale. The generated image
+    # and its enhancement are two distinct, useful outputs — not a silent
+    # before/after replacement.
+    original_url = asset.get("original_image_url") or asset.get("image_url", "")
+    if original_url and not url_expired:
+        body_children.extend([
+            ui.Text("Original image", variant="label"),
+            ui.Image(
+                src=original_url, alt=asset.get("alt_text", ""),
+                width="100%", object_fit="cover",
+            ),
+            ui.Text(
+                " · ".join(part for part in (
+                    asset.get("original_dimensions", ""),
+                    asset.get("original_format", ""),
+                ) if part) or "Size and format unavailable",
+                variant="caption",
+            ),
+        ])
+        if asset.get("upscaled_image_url"):
+            body_children.extend([
+                ui.Text("Upscaled image", variant="label"),
+                ui.Image(
+                    src=asset["upscaled_image_url"],
+                    alt=asset.get("alt_text", ""),
+                    width="100%", object_fit="cover",
+                ),
+                ui.Text(
+                    " · ".join(part for part in (
+                        asset.get("upscaled_dimensions", ""),
+                        asset.get("upscaled_format", ""),
+                    ) if part) or "Size and format unavailable",
+                    variant="caption",
+                ),
+            ])
     elif url_expired:
         # Root cause of the reported "status=ready but shows Image
         # unavailable" bug: Magnific/Freepik's CDN link carries a token that
@@ -303,18 +333,30 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     else:
         body_children.append(ui.Text("Not generated yet.", variant="caption"))
 
-    body_children.append(ui.Text(asset.get("prompt", ""), variant="caption"))
+    # Clear labels matter more than clever placeholders here: this is the
+    # publish-ready metadata a non-technical editor needs to understand.
+    display_format = asset.get("upscaled_format") or asset.get("original_format", "")
+    image_title = asset.get("filename") or _asset_title(role)
+    title_line = image_title + (f" · {display_format}" if display_format else "")
+    body_children.extend([
+        ui.Text("Image title", variant="label"),
+        ui.Text(title_line, variant="caption"),
+        ui.Text("Description", variant="label"),
+        ui.Text(asset.get("prompt", "") or "No description available.", variant="caption"),
+    ])
     if asset.get("model"):
         body_children.append(ui.Badge(label="Model", value=asset["model"], color="purple"))
 
     body_children.append(ui.Form(
         action="update_asset_meta",
-        submit_label="Save alt/caption",
+        submit_label="Save metadata",
         defaults={"package_id": package_id, "role": role},
         children=[
-            ui.Input(param_name="alt_text", placeholder="Alt text",
+            ui.Text("Alt text", variant="label"),
+            ui.Input(param_name="alt_text", placeholder="Describe the image for screen readers",
                      value=asset.get("alt_text", "")),
-            ui.Input(param_name="caption", placeholder="Caption (optional)",
+            ui.Text("Caption", variant="label"),
+            ui.Input(param_name="caption", placeholder="Short visible caption (optional)",
                      value=asset.get("caption", "")),
         ],
     ))

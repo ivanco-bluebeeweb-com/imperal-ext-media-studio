@@ -36,8 +36,8 @@ async def test_small_image_is_auto_upscaled(monkeypatch):
     calls = {}
 
     async def fake_download(url):
-        calls["download_url"] = url
-        return _png(1024, 768)
+        calls.setdefault("download_urls", []).append(url)
+        return _png(1024, 768) if "original" in url else _png(2048, 1536)
 
     async def fake_upscale(ctx_arg, api_key, image_bytes, scale_factor):
         calls["upscale"] = (ctx_arg, api_key, image_bytes, scale_factor)
@@ -48,8 +48,17 @@ async def test_small_image_is_auto_upscaled(monkeypatch):
 
     result = await h._maybe_upscale_asset_image(ctx, "key", "https://cdn.example/original.png")
 
-    assert result == "https://cdn.example/upscaled.png"
-    assert calls["download_url"] == "https://cdn.example/original.png"
+    assert result["image_url"] == "https://cdn.example/upscaled.png"
+    assert result["original_image_url"] == "https://cdn.example/original.png"
+    assert result["original_format"] == "PNG"
+    assert result["original_dimensions"] == "1024 × 768 px"
+    assert result["upscaled_image_url"] == "https://cdn.example/upscaled.png"
+    assert result["upscaled_format"] == "PNG"
+    assert result["upscaled_dimensions"] == "2048 × 1536 px"
+    assert calls["download_urls"] == [
+        "https://cdn.example/original.png",
+        "https://cdn.example/upscaled.png",
+    ]
     assert calls["upscale"][1] == "key"
     assert calls["upscale"][2] == _png(1024, 768)
     assert calls["upscale"][3] == "2x"
@@ -70,7 +79,12 @@ async def test_image_at_1500px_or_larger_is_not_upscaled(monkeypatch):
     monkeypatch.setattr(h.mc, "upscale_image", must_not_upscale)
 
     original = "https://cdn.example/large.png"
-    assert await h._maybe_upscale_asset_image(ctx, "key", original) == original
+    result = await h._maybe_upscale_asset_image(ctx, "key", original)
+    assert result["image_url"] == original
+    assert result["original_image_url"] == original
+    assert result["original_format"] == "PNG"
+    assert result["original_dimensions"] == "2000 × 1500 px"
+    assert result["upscaled_image_url"] == ""
     assert ctx.logs == []
 
 
@@ -84,7 +98,11 @@ async def test_unknown_image_format_keeps_original_and_logs_warning(monkeypatch)
     monkeypatch.setattr(h.mc, "download_image_bytes", fake_download)
 
     original = "https://cdn.example/unknown.avif"
-    assert await h._maybe_upscale_asset_image(ctx, "key", original) == original
+    result = await h._maybe_upscale_asset_image(ctx, "key", original)
+    assert result["image_url"] == original
+    assert result["original_image_url"] == original
+    assert result["original_format"] == ""
+    assert result["original_dimensions"] == ""
     assert ctx.logs and ctx.logs[0][1] == "warning"
 
 
@@ -102,5 +120,10 @@ async def test_upscale_failure_keeps_original_and_logs_warning(monkeypatch):
     monkeypatch.setattr(h.mc, "upscale_image", failed_upscale)
 
     original = "https://cdn.example/original.png"
-    assert await h._maybe_upscale_asset_image(ctx, "key", original) == original
+    result = await h._maybe_upscale_asset_image(ctx, "key", original)
+    assert result["image_url"] == original
+    assert result["original_image_url"] == original
+    assert result["original_format"] == "PNG"
+    assert result["original_dimensions"] == "1024 × 768 px"
+    assert result["upscaled_image_url"] == ""
     assert ctx.logs and ctx.logs[0][1] == "warning"
