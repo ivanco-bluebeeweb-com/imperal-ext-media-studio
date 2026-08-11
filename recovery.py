@@ -13,6 +13,7 @@ import re
 from urllib.parse import parse_qs, urlparse
 
 import magnific_client as mc
+import model_registry as mr
 
 
 CREATIONS_RECENT_PATH = "/v1/creations/recent"
@@ -71,28 +72,43 @@ def _creation_urls(record: dict) -> list[str]:
     return list(dict.fromkeys(urls))
 
 
-_TASK_PATHS = {
-    "mystic": mc.CREATE_PATH,
-    "imagen4-fast": "/v1/ai/text-to-image/imagen4-fast",
-    "imagen4-ultra": "/v1/ai/text-to-image/imagen4-ultra",
-}
+def _task_status_paths(preferred_model: str) -> list[str]:
+    """Every documented task endpoint, with the recorded model first."""
+    paths: list[str] = []
+    if preferred_model == "mystic":
+        paths.append(mc.CREATE_PATH)
+    else:
+        spec = mr.MODELS.get(preferred_model)
+        if spec and spec.status_path:
+            paths.append(spec.status_path.removesuffix("/{task_id}"))
+    paths.append(mc.CREATE_PATH)
+    paths.extend(
+        spec.status_path.removesuffix("/{task_id}")
+        for spec in mr.MODELS.values()
+        if spec.status_path
+    )
+    return list(dict.fromkeys(paths))
 
 
 async def get_provider_task_image_url(ctx, api_key: str, model: str, task_id: str) -> str:
-    """Read one historic task and return its sole source-image URL.
+    """Find one historic task through documented model status endpoints only.
 
-    Model paths are restricted to the exact documented providers that issued
-    legacy Media Hub URLs. A task URL is copied only after that task itself
-    reports one completed output -- never by a visual or prompt guess.
+    Some early packages did not persist their model.  We can still safely
+    identify their original task: every candidate call is a read of the exact
+    saved task ID, and only a completed task with exactly one output is used.
+    A 404 merely means that this task belongs to another documented model.
     """
-    path = _TASK_PATHS.get(model)
-    if not path:
-        return ""
-    result = await mc.get_model_task(ctx, api_key, path, task_id)
-    if result.get("state") != "done":
-        return ""
-    urls = list(dict.fromkeys(result.get("image_urls", [])))
-    return urls[0] if len(urls) == 1 else ""
+    for path in _task_status_paths(model):
+        try:
+            result = await mc.get_model_task(ctx, api_key, path, task_id)
+        except mc.ProviderError:
+            continue
+        if result.get("state") != "done":
+            continue
+        urls = list(dict.fromkeys(result.get("image_urls", [])))
+        if len(urls) == 1:
+            return urls[0]
+    return ""
 
 
 async def list_recent_creations(ctx, api_key: str, *, max_pages: int = 20) -> list[dict]:
