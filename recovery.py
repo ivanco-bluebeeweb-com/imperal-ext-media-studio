@@ -52,6 +52,13 @@ def _identity_tokens(value) -> set[str]:
     return tokens
 
 
+def task_ids_from_asset(asset: dict) -> list[str]:
+    """Return unique source task ids retained by an asset or its old URL."""
+    raw_ids = [asset.get("provider_task_id", "")]
+    raw_ids.extend(_UUID_RE.findall(asset.get("original_image_url") or asset.get("image_url", "")))
+    return list(dict.fromkeys(item for item in raw_ids if item))
+
+
 def _creation_urls(record: dict) -> list[str]:
     """Prefer the documented full creation URL, never a thumbnail or preview."""
     creation = record.get("creation")
@@ -62,6 +69,19 @@ def _creation_urls(record: dict) -> list[str]:
         if value.startswith("https://") and "thumbnail" not in value and "preview" not in value:
             urls.append(value)
     return list(dict.fromkeys(urls))
+
+
+async def get_mystic_task_image_url(ctx, api_key: str, task_id: str) -> str:
+    """Read one historic Mystic task and return its sole generated image URL.
+
+    The task id is the UUID kept in legacy Media Hub URLs.  The endpoint is
+    Magnific's documented `GET /v1/ai/mystic/{task-id}` status endpoint.
+    """
+    result = await mc.get_mystic_task(ctx, api_key, task_id)
+    if result.get("state") != "done":
+        return ""
+    urls = list(dict.fromkeys(result.get("image_urls", [])))
+    return urls[0] if len(urls) == 1 else ""
 
 
 async def list_recent_creations(ctx, api_key: str, *, max_pages: int = 20) -> list[dict]:
