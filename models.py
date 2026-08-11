@@ -179,9 +179,11 @@ class MediaAsset(sdl.Entity):
     original_image_url: str = "" # provider output before optional auto-upscale
     original_dimensions: str = ""# verified `WIDTH × HEIGHT px`, never guessed from a URL
     original_format: str = ""    # verified PNG/JPEG/WebP format
+    original_file_size: str = "" # verified human-readable byte count
     upscaled_image_url: str = "" # result from Upscaler Creative; empty when no upscale ran
     upscaled_dimensions: str = ""# verified `WIDTH × HEIGHT px`
     upscaled_format: str = ""    # verified PNG/JPEG/WebP format
+    upscaled_file_size: str = "" # verified human-readable byte count
     filename: str = ""           # SEO/AEO-optimized base filename (no extension) -- carried through to the site's upload so the LIVE file name is never the provider's raw generated id
     prompt: str = ""
     alt_text: str = ""

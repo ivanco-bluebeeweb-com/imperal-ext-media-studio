@@ -60,6 +60,15 @@ def describe_image(data: bytes) -> tuple[str, str]:
     return image_format(data), format_dimensions(get_image_dimensions(data))
 
 
+def format_file_size(byte_count: int) -> str:
+    """Render an exact downloaded byte count as a short card label."""
+    if byte_count < 1024:
+        return f"{byte_count} B"
+    if byte_count < 1024 * 1024:
+        return f"{byte_count / 1024:.1f} KB"
+    return f"{byte_count / (1024 * 1024):.1f} MB"
+
+
 # Binary parsers below intentionally do not use file extensions or content-type:
 # the downloaded bytes are the only reliable source for the card's labels.
 

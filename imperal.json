@@ -201,6 +201,11 @@
                 "title": "Original Format",
                 "type": "string"
               },
+              "original_file_size": {
+                "default": "",
+                "title": "Original File Size",
+                "type": "string"
+              },
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
@@ -214,6 +219,11 @@
               "upscaled_format": {
                 "default": "",
                 "title": "Upscaled Format",
+                "type": "string"
+              },
+              "upscaled_file_size": {
+                "default": "",
+                "title": "Upscaled File Size",
                 "type": "string"
               },
               "filename": {
@@ -528,6 +538,11 @@
                 "title": "Original Format",
                 "type": "string"
               },
+              "original_file_size": {
+                "default": "",
+                "title": "Original File Size",
+                "type": "string"
+              },
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
@@ -541,6 +556,11 @@
               "upscaled_format": {
                 "default": "",
                 "title": "Upscaled Format",
+                "type": "string"
+              },
+              "upscaled_file_size": {
+                "default": "",
+                "title": "Upscaled File Size",
                 "type": "string"
               },
               "filename": {
@@ -866,6 +886,11 @@
                 "title": "Original Format",
                 "type": "string"
               },
+              "original_file_size": {
+                "default": "",
+                "title": "Original File Size",
+                "type": "string"
+              },
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
@@ -879,6 +904,11 @@
               "upscaled_format": {
                 "default": "",
                 "title": "Upscaled Format",
+                "type": "string"
+              },
+              "upscaled_file_size": {
+                "default": "",
+                "title": "Upscaled File Size",
                 "type": "string"
               },
               "filename": {
@@ -1191,6 +1221,11 @@
                 "title": "Original Format",
                 "type": "string"
               },
+              "original_file_size": {
+                "default": "",
+                "title": "Original File Size",
+                "type": "string"
+              },
               "upscaled_image_url": {
                 "default": "",
                 "title": "Upscaled Image Url",
@@ -1204,6 +1239,11 @@
               "upscaled_format": {
                 "default": "",
                 "title": "Upscaled Format",
+                "type": "string"
+              },
+              "upscaled_file_size": {
+                "default": "",
+                "title": "Upscaled File Size",
                 "type": "string"
               },
               "filename": {
@@ -1534,6 +1574,11 @@
             "title": "Original Format",
             "type": "string"
           },
+          "original_file_size": {
+            "default": "",
+            "title": "Original File Size",
+            "type": "string"
+          },
           "upscaled_image_url": {
             "default": "",
             "title": "Upscaled Image Url",
@@ -1547,6 +1592,11 @@
           "upscaled_format": {
             "default": "",
             "title": "Upscaled Format",
+            "type": "string"
+          },
+          "upscaled_file_size": {
+            "default": "",
+            "title": "Upscaled File Size",
             "type": "string"
           },
           "filename": {
@@ -1731,6 +1781,11 @@
             "title": "Original Format",
             "type": "string"
           },
+          "original_file_size": {
+            "default": "",
+            "title": "Original File Size",
+            "type": "string"
+          },
           "upscaled_image_url": {
             "default": "",
             "title": "Upscaled Image Url",
@@ -1744,6 +1799,11 @@
           "upscaled_format": {
             "default": "",
             "title": "Upscaled Format",
+            "type": "string"
+          },
+          "upscaled_file_size": {
+            "default": "",
+            "title": "Upscaled File Size",
             "type": "string"
           },
           "filename": {
@@ -1934,6 +1994,11 @@
             "title": "Original Format",
             "type": "string"
           },
+          "original_file_size": {
+            "default": "",
+            "title": "Original File Size",
+            "type": "string"
+          },
           "upscaled_image_url": {
             "default": "",
             "title": "Upscaled Image Url",
@@ -1947,6 +2012,11 @@
           "upscaled_format": {
             "default": "",
             "title": "Upscaled Format",
+            "type": "string"
+          },
+          "upscaled_file_size": {
+            "default": "",
+            "title": "Upscaled File Size",
             "type": "string"
           },
           "filename": {

@@ -52,9 +52,11 @@ async def test_small_image_is_auto_upscaled(monkeypatch):
     assert result["original_image_url"] == "https://cdn.example/original.png"
     assert result["original_format"] == "PNG"
     assert result["original_dimensions"] == "1024 × 768 px"
+    assert result["original_file_size"]
     assert result["upscaled_image_url"] == "https://cdn.example/upscaled.png"
     assert result["upscaled_format"] == "PNG"
     assert result["upscaled_dimensions"] == "2048 × 1536 px"
+    assert result["upscaled_file_size"]
     assert calls["download_urls"] == [
         "https://cdn.example/original.png",
         "https://cdn.example/upscaled.png",

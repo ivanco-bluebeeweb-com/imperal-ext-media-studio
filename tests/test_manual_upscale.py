@@ -57,6 +57,8 @@ async def test_manual_upscale_keeps_original_and_saves_upscaled_version(ctx_with
     assert asset["original_dimensions"] == "1024 × 768 px"
     assert asset["upscaled_image_url"] == "https://cdn.example/upscaled.png?token=fresh"
     assert asset["upscaled_dimensions"] == "4096 × 3072 px"
+    assert asset["original_file_size"]
+    assert asset["upscaled_file_size"]
     assert asset["image_url"] == asset["upscaled_image_url"]
 
 

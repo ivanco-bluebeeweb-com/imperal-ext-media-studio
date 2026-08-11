@@ -271,137 +271,115 @@ def _settings_view(ctx, connections: list, log: list[dict]) -> ui.UINode:
 def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     role = asset.get("role", "")
     status = asset.get("status", "pending")
-    body_children: list[ui.UINode] = []
-
+    image_children: list[ui.UINode] = []
     url_expired = status == "ready" and is_image_url_expired(asset.get("image_url", ""))
 
-    # Keep the original visible even after auto-upscale. The generated image
-    # and its enhancement are two distinct, useful outputs — not a silent
-    # before/after replacement.
+    # The original is a distinct deliverable: never hide it behind its upscale.
     original_url = asset.get("original_image_url") or asset.get("image_url", "")
     if original_url and not url_expired:
-        body_children.extend([
+        image_children.extend([
             ui.Text("Original image", variant="label"),
-            ui.Image(
-                src=original_url, alt=asset.get("alt_text", ""),
-                width="100%", object_fit="cover",
-            ),
+            ui.Image(src=original_url, alt=asset.get("alt_text", ""), width="100%", object_fit="cover"),
             ui.Text(
                 " · ".join(part for part in (
-                    asset.get("original_dimensions", ""),
-                    asset.get("original_format", ""),
-                ) if part) or "Size and format unavailable",
+                    asset.get("original_dimensions", ""), asset.get("original_format", ""),
+                    asset.get("original_file_size", ""),
+                ) if part) or "Size, format and file weight unavailable",
                 variant="caption",
             ),
         ])
         if asset.get("upscaled_image_url"):
-            body_children.extend([
+            image_children.extend([
                 ui.Text("Upscaled image", variant="label"),
-                ui.Image(
-                    src=asset["upscaled_image_url"],
-                    alt=asset.get("alt_text", ""),
-                    width="100%", object_fit="cover",
-                ),
+                ui.Image(src=asset["upscaled_image_url"], alt=asset.get("alt_text", ""), width="100%", object_fit="cover"),
                 ui.Text(
                     " · ".join(part for part in (
-                        asset.get("upscaled_dimensions", ""),
-                        asset.get("upscaled_format", ""),
-                    ) if part) or "Size and format unavailable",
+                        asset.get("upscaled_dimensions", ""), asset.get("upscaled_format", ""),
+                        asset.get("upscaled_file_size", ""),
+                    ) if part) or "Size, format and file weight unavailable",
                     variant="caption",
                 ),
             ])
     elif url_expired:
-        # Root cause of the reported "status=ready but shows Image
-        # unavailable" bug: Magnific/Freepik's CDN link carries a token that
-        # expires a few hours after generation, but `status` never gets
-        # re-checked. Surfacing this explicitly (instead of a silently
-        # broken <img>) tells the user exactly why and what to do --
-        # "Regenerate" below now actually works for this asset since
-        # generate_media_package/regenerate_asset no longer treat an expired
-        # "ready" asset as already done.
-        body_children.append(ui.Alert(
+        image_children.append(ui.Alert(
             title="Image link expired",
-            message="This image was generated earlier and its hosted link "
-                    "has expired. Click Regenerate below to get a fresh one.",
+            message="This image was generated earlier and its hosted link has expired. Open Regenerate below to get a fresh one.",
             type="warning",
         ))
     elif status == "generating":
-        body_children.append(ui.Loading(message="Generating..."))
+        image_children.append(ui.Loading(message="Generating..."))
     elif status == "failed":
-        body_children.append(ui.Alert(
-            message=asset.get("error", "Generation failed."), type="error",
-        ))
+        image_children.append(ui.Alert(message=asset.get("error", "Generation failed."), type="error"))
     else:
-        body_children.append(ui.Text("Not generated yet.", variant="caption"))
+        image_children.append(ui.Text("Not generated yet.", variant="caption"))
 
-    # A manual upscale is intentionally an explicit, small action. The source
-    # image remains in the card above; this form only makes a new larger copy.
-    if original_url and not url_expired:
-        body_children.append(ui.Section(
-            title="Upscale Image",
-            children=[
-                ui.Form(
-                    action="generate_asset_upscale",
-                    submit_label="Generate Upscale",
-                    defaults={"package_id": package_id, "role": role},
-                    children=[
-                        ui.Text("Increase size", variant="label"),
-                        ui.Select(
-                            param_name="scale_factor",
-                            options=[
-                                {"value": factor, "label": factor}
-                                for factor in mc.available_upscale_scale_factors()
-                            ],
-                            value="2x",
-                        ),
-                    ],
-                ),
-            ],
-        ))
-
-    # Clear labels matter more than clever placeholders here: this is the
-    # publish-ready metadata a non-technical editor needs to understand.
     display_format = asset.get("upscaled_format") or asset.get("original_format", "")
     image_title = asset.get("filename") or _asset_title(role)
     title_line = image_title + (f" · {display_format}" if display_format else "")
-    body_children.extend([
+    upscale_children: list[ui.UINode] = []
+    if original_url and not url_expired:
+        upscale_children.append(ui.Form(
+            action="generate_asset_upscale",
+            submit_label="Generate Upscale",
+            defaults={"package_id": package_id, "role": role},
+            children=[
+                ui.Text("Increase size", variant="label"),
+                ui.Select(
+                    param_name="scale_factor",
+                    options=[{"value": factor, "label": factor} for factor in mc.available_upscale_scale_factors()],
+                    value="2x",
+                ),
+            ],
+        ))
+    else:
+        upscale_children.append(ui.Text("Generate or regenerate the image before upscaling it.", variant="caption"))
+
+    metadata_children: list[ui.UINode] = [
         ui.Text("Image title", variant="label"),
         ui.Text(title_line, variant="caption"),
-        ui.Text("Description", variant="label"),
+        ui.Text("Image description", variant="label"),
         ui.Text(asset.get("prompt", "") or "No description available.", variant="caption"),
-    ])
+    ]
     if asset.get("model"):
-        body_children.append(ui.Badge(label="Model", value=asset["model"], color="purple"))
-
-    body_children.append(ui.Form(
+        metadata_children.append(ui.Badge(label="Model", value=asset["model"], color="purple"))
+    metadata_children.append(ui.Form(
         action="update_asset_meta",
         submit_label="Save metadata",
         defaults={"package_id": package_id, "role": role},
         children=[
             ui.Text("Alt text", variant="label"),
-            ui.Input(param_name="alt_text", placeholder="Describe the image for screen readers",
-                     value=asset.get("alt_text", "")),
+            ui.Input(param_name="alt_text", placeholder="Describe the image for screen readers", value=asset.get("alt_text", "")),
             ui.Text("Caption", variant="label"),
-            ui.Input(param_name="caption", placeholder="Short visible caption (optional)",
-                     value=asset.get("caption", "")),
+            ui.Input(param_name="caption", placeholder="Short visible caption (optional)", value=asset.get("caption", "")),
         ],
     ))
 
-    body_children.append(ui.Form(
+    regenerate_children = [ui.Form(
         action="regenerate_asset",
         submit_label="Regenerate",
         defaults={"package_id": package_id, "role": role},
         children=[
-            ui.Select(param_name="model", options=_MODEL_OPTIONS,
-                      value=asset.get("model", ""),
-                      placeholder="Model override (optional)"),
+            ui.Text("Model", variant="label"),
+            ui.Select(param_name="model", options=_MODEL_OPTIONS, value=asset.get("model", ""), placeholder="Choose a model"),
         ],
-    ))
+    )]
+    image_children.append(ui.Accordion(sections=[
+        {"id": "upscaling", "title": "Upscaling", "children": upscale_children},
+        {"id": "metadata", "title": "Metadata", "children": metadata_children},
+        {"id": "regenerate", "title": "Regenerate", "children": regenerate_children},
+    ]))
 
+    role_title = (role or "image").replace("_", " ").title()
+    image_children.insert(0, ui.Row(
+        children=[
+            ui.Text(f"{role_title} Image", variant="label"),
+            _status_badge(status),
+        ],
+        gap=2,
+    ))
     return ui.Card(
-        title=role,
-        subtitle=status,
-        content=ui.Stack(children=body_children, gap=2),
+        title=f"{role_title} Image",
+        content=ui.Stack(children=image_children, gap=2),
     )
 
 

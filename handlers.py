@@ -161,9 +161,11 @@ async def _maybe_upscale_asset_image(ctx, api_key: str, image_url: str) -> dict:
         "original_image_url": image_url,
         "original_dimensions": "",
         "original_format": "",
+        "original_file_size": "",
         "upscaled_image_url": "",
         "upscaled_dimensions": "",
         "upscaled_format": "",
+        "upscaled_file_size": "",
     }
     if not image_url:
         return result
@@ -180,6 +182,7 @@ async def _maybe_upscale_asset_image(ctx, api_key: str, image_url: str) -> dict:
     original_format, original_dimensions = image_dims.describe_image(original_bytes)
     result["original_format"] = original_format
     result["original_dimensions"] = original_dimensions
+    result["original_file_size"] = image_dims.format_file_size(len(original_bytes))
     if dims is None:
         await ctx.log(
             "Generated image isn't a recognized PNG/JPEG/WebP; skipping "
@@ -207,6 +210,7 @@ async def _maybe_upscale_asset_image(ctx, api_key: str, image_url: str) -> dict:
         upscaled_image_url=upscaled_url,
         upscaled_format=upscaled_format,
         upscaled_dimensions=upscaled_dimensions,
+        upscaled_file_size=image_dims.format_file_size(len(upscaled_bytes)),
     )
     return result
 
@@ -224,9 +228,11 @@ def _package_to_entity(row: dict) -> MediaPackage:
             original_image_url=a.get("original_image_url", ""),
             original_dimensions=a.get("original_dimensions", ""),
             original_format=a.get("original_format", ""),
+            original_file_size=a.get("original_file_size", ""),
             upscaled_image_url=a.get("upscaled_image_url", ""),
             upscaled_dimensions=a.get("upscaled_dimensions", ""),
             upscaled_format=a.get("upscaled_format", ""),
+            upscaled_file_size=a.get("upscaled_file_size", ""),
             filename=a.get("filename", ""),
             alt_text=a.get("alt_text", ""),
             caption=a.get("caption", ""),
@@ -698,9 +704,12 @@ async def generate_asset_upscale(ctx, params: GenerateAssetUpscaleParams) -> Act
                 original_image_url=original_url,
                 original_format=target.get("original_format") or original_format,
                 original_dimensions=target.get("original_dimensions") or original_dimensions,
+                original_file_size=(target.get("original_file_size")
+                                    or image_dims.format_file_size(len(original_bytes))),
                 upscaled_image_url=upscaled_url,
                 upscaled_format=upscaled_format,
                 upscaled_dimensions=upscaled_dimensions,
+                upscaled_file_size=image_dims.format_file_size(len(upscaled_bytes)),
             )
             current = await st.update_package(ctx, params.package_id, {"assets": assets})
             refreshed = next((asset for asset in current.get("assets", []) if asset.get("role") == params.role), target)
