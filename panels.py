@@ -8,19 +8,23 @@ that dispatches the loser looks like nothing happening. So there is exactly
 one owner, `studio`, and `view` picks the screen:
 
     ui.Call("__panel__studio")                     -> packages (default)
-    ui.Call("__panel__studio", view="connect")      -> Connect Magnific screen
-    ui.Call("__panel__studio", view="providers")    -> Providers/manage screen
+    ui.Call("__panel__studio", view="settings")     -> App settings screen
     ui.Call("__panel__studio", view="editor", package_id=...) -> package editor
 
-WHY THIS REPLACES THE OLD "let the platform Secrets screen handle it" DESIGN.
-v1 declared `magnific_api_key` as `write_mode="user"` and shipped with no
-in-app connect screen at all, reasoning the platform's generic Secrets panel
-was enough. In practice the user could not find it or tell what a "Magnific
-API key" even was. The secret is now `write_mode="both"` (see app.py) and
-`providers.py` validates a pasted key against Magnific before saving it, so
-this file adds the two screens that make that discoverable: `connect` (first-
-run) and `providers` (status + disconnect, anticipating a second provider
-later without a schema change -- see `providers.list_provider_connections`).
+WHY ONE "App settings" SCREEN, NOT TWO ("connect" + "providers").
+UI_INTERFACE_STANDARD.md requires exactly one "App settings" button in the
+sidebar, replacing the center slot, gathering EVERYTHING configurable in one
+place. Splitting provider-connect and provider-manage across two screens was
+fine back when there was only a key to paste, but it also meant the daily
+model-discovery check (check_new_models / list_model_discovery_log) had NO
+panel surface at all -- chat-only, invisible to a user who never opens chat.
+`settings` replaces both old screens and folds in that discovery section too.
+`connect`/`providers` are still accepted as view aliases so nothing that
+already links to them breaks.
+
+The secret is `write_mode="both"` (see app.py) and `providers.py` validates
+a pasted key against Magnific before saving it, so the settings screen can
+show live connect/disconnect status instead of guessing.
 
 Every component below is used strictly per its real signature in
 `imperal_sdk.ui` (checked in source, not guessed) -- e.g. `ui.List` takes
@@ -34,6 +38,7 @@ from __future__ import annotations
 from imperal_sdk import ui
 
 from app import ext
+import model_discovery as md
 import storage as st
 import model_registry as mr
 from providers import list_provider_connections
@@ -102,8 +107,8 @@ async def packages_nav_panel(ctx) -> ui.UINode:
         ),
         content=ui.Stack(children=[
             ui.Button(
-                "Manage providers", icon="Plug", variant="secondary", size="sm",
-                on_click=ui.Call("__panel__studio", view="providers"),
+                "App settings", icon="Settings", variant="secondary", size="sm",
+                on_click=ui.Call("__panel__studio", view="settings"),
             ),
         ], direction="h"),
     )
@@ -156,120 +161,101 @@ async def packages_nav_panel(ctx) -> ui.UINode:
     return ui.Stack(children=children, gap=3)
 
 
-# ── Connect screen ───────────────────────────────────────────────────────────
+# ── App settings screen -- EVERYTHING configurable, one place ──────────────
+#
+# UI_INTERFACE_STANDARD.md rule 1-3: exactly one "App settings" button, it
+# replaces the center slot, and it gathers every configurable thing --
+# not just the provider key. Before this, "Connect" and "Providers" were two
+# separate screens (fine when there was only a key to manage), and the daily
+# model-discovery check (check_new_models / list_model_discovery_log) was a
+# chat-only tool with NO panel surface at all -- a user who doesn't use chat
+# could never see whether new models had been found. This screen replaces
+# both old screens and adds the missing discovery section.
 
-def _connect_view(connections: list) -> ui.UINode:
+def _settings_view(ctx, connections: list, log: list[dict]) -> ui.UINode:
     magnific = next((c for c in connections if c.provider == "magnific"), None)
     connected = bool(magnific and magnific.connected)
 
     children: list[ui.UINode] = [
-        ui.Header(text="Connect Magnific", level=2,
-                   subtitle="One key, checked before it's saved"),
+        ui.Header(text="App settings", level=2,
+                   subtitle="Everything you can configure in Media Hub"),
     ]
 
+    # -- Image provider --------------------------------------------------
+    provider_children: list[ui.UINode] = []
     if connected:
-        children.append(ui.Alert(
-            title="Magnific is connected",
-            message="Image generation is ready. Paste a new key below only "
-                     "if you need to replace it (e.g. a rotated key).",
+        provider_children.append(ui.Alert(
+            title="Magnific connected", message="Images are ready to generate.",
             type="success",
         ))
     else:
-        children.append(ui.Alert(
-            title="Not connected yet",
-            message="Media briefs can be drafted without this, but "
-                     "generating images needs a Magnific API key.",
+        provider_children.append(ui.Alert(
+            title="Not connected",
+            message="Paste an API key below to start generating images.",
             type="info",
         ))
+        provider_children.append(ui.Link(
+            label="Get a key on magnific.com", href=_MAGNIFIC_SIGNUP_URL,
+        ))
 
-    children.append(ui.Section(
-        title="1. Get an API key",
+    provider_children.append(ui.Form(
+        action="connect_magnific",
+        submit_label="Verify and connect",
         children=[
-            ui.Text(
-                content=(
-                    "Magnific API keys require a Business or Enterprise "
-                    "plan. Once on one of those plans: user menu -> "
-                    "Organization Settings -> API Keys -> Create API key."
-                ),
-                variant="body",
-            ),
-            ui.Link(label="Open magnific.com", href=_MAGNIFIC_SIGNUP_URL),
+            ui.Password(param_name="api_key", placeholder="Magnific API key"),
         ],
     ))
-
-    children.append(ui.Section(
-        title="2. Paste it here",
-        children=[
-            ui.Text(
-                content=(
-                    "The key is verified against Magnific before it is "
-                    "saved -- an invalid key is rejected immediately instead "
-                    "of failing silently the first time you generate."
-                ),
-                variant="caption",
-            ),
-            ui.Form(
-                action="connect_magnific",
-                submit_label="Verify and connect",
-                children=[
-                    ui.Password(param_name="api_key",
-                                placeholder="Magnific API key"),
-                ],
-            ),
-        ],
-    ))
-
     if connected:
-        children.append(ui.Button(
-            "Disconnect Magnific", icon="Unlink", variant="danger", size="sm",
+        provider_children.append(ui.Button(
+            "Disconnect", icon="Unlink", variant="danger", size="sm",
             on_click=ui.Call("disconnect_magnific"),
         ))
+    children.append(ui.Section(title="Image provider", children=provider_children))
 
-    children.append(ui.Button(
-        "Back", variant="ghost",
-        on_click=ui.Call("__panel__studio", view="providers"),
-    ))
-
-    return ui.Stack(children=children, gap=4)
-
-
-# ── Providers screen (manage / switch, anticipates more providers) ─────────
-
-def _providers_view(connections: list) -> ui.UINode:
-    children: list[ui.UINode] = [
-        ui.Header(text="Providers", level=2,
-                   subtitle="Image-generation backends Media Hub can use"),
-    ]
-
-    items = []
-    for conn in connections:
-        actions_row = ui.Stack(children=[
-            ui.Button(
-                "Disconnect" if conn.connected else "Connect",
-                variant="secondary" if conn.connected else "primary",
-                size="sm",
-                on_click=(
-                    ui.Call("disconnect_magnific") if conn.connected
-                    else ui.Call("__panel__studio", view="connect")
-                ),
+    # -- Webhook secret (declared, not used yet -- say so honestly) -----
+    children.append(ui.Section(
+        title="Webhook secret",
+        children=[
+            ui.Text(
+                content="Not needed yet -- Media Hub checks image status "
+                        "itself, without webhooks.",
+                variant="caption",
             ),
-        ], direction="h")
-
-        items.append(ui.Card(
-            title=conn.title,
-            subtitle=conn.detail,
-            content=actions_row,
-        ))
-
-    children.append(ui.Stack(children=items, gap=3))
-
-    children.append(ui.Alert(
-        title="One provider today",
-        message="Magnific (Mystic) is the only image backend right now. "
-                 "This screen is built to list more providers side by side "
-                 "as they're added -- no redesign needed later.",
-        type="info",
+        ],
     ))
+
+    # -- New model checks (was chat-only; now visible here too) ----------
+    discovery_children: list[ui.UINode] = [
+        ui.Text(
+            content="Media Hub checks once a day for new image models. "
+                    "It only reports what it finds -- it never turns that "
+                    "on by itself.",
+            variant="caption",
+        ),
+        ui.Button(
+            "Check now", icon="RefreshCw", variant="secondary",
+            size="sm", on_click=ui.Call("check_new_models"),
+        ),
+    ]
+    if log:
+        items = [
+            ui.ListItem(
+                id=entry.get("date", ""),
+                title=entry.get("date", ""),
+                subtitle=(
+                    f"{len(entry.get('found') or [])} new candidate(s)"
+                    if entry.get("found") else "nothing new"
+                ),
+                meta=entry.get("result", ""),
+            )
+            for entry in log
+        ]
+        discovery_children.append(ui.List(items=items))
+    else:
+        discovery_children.append(ui.Empty(
+            message="No checks yet -- click Check now above.",
+        ))
+    children.append(ui.Section(title="New model checks", children=discovery_children))
 
     children.append(ui.Button(
         "Close", variant="ghost",
@@ -363,7 +349,7 @@ def _editor_new(ctx, any_connected: bool) -> ui.UINode:
         ))
         children.append(ui.Button(
             "Connect Magnific", icon="Plug", variant="secondary", size="sm",
-            on_click=ui.Call("__panel__studio", view="connect"),
+            on_click=ui.Call("__panel__studio", view="settings"),
         ))
 
     children.append(ui.Form(
@@ -443,11 +429,13 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
     refresh="manual",
 )
 async def studio_panel(ctx, **kwargs) -> ui.UINode:
-    """The one center-overlay owner. `view` selects packages/connect/providers/editor.
+    """The one center-overlay owner. `view` selects packages/settings/editor.
 
     Default view: a first-time user with no provider connected lands on
-    `connect` automatically -- the same "answer what do I do now" pattern as
+    `settings` automatically -- the same "answer what do I do now" pattern as
     Notion/Asana Connector's center panel -- instead of an empty editor.
+    `connect`/`providers` are accepted as aliases for `settings` so any old
+    bookmarked ui.Call still lands somewhere sensible.
     """
     view = str(kwargs.get("view") or "").strip().lower()
     package_id = str(kwargs.get("package_id") or "").strip()
@@ -455,15 +443,32 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
     connections = await list_provider_connections(ctx)
     any_connected = any(c.connected for c in connections)
 
-    if view == "connect":
-        return _connect_view(connections)
-    if view == "providers":
-        return _providers_view(connections)
+    if view in ("settings", "connect", "providers"):
+        log = await md.list_log(ctx, limit=5)
+        return _settings_view(ctx, connections, log)
     if view == "editor" or package_id:
         if not package_id or package_id == "new":
             return _editor_new(ctx, any_connected)
         return await _editor_existing(ctx, package_id, any_connected)
 
     if not any_connected:
-        return _connect_view(connections)
-    return _providers_view(connections)
+        log = await md.list_log(ctx, limit=5)
+        return _settings_view(ctx, connections, log)
+    return _default_view()
+
+
+def _default_view() -> ui.UINode:
+    """Landing state for a connected user with no package/settings view
+    picked yet -- point at the two things that actually do something
+    (pick a package on the left, or start a new brief) instead of
+    surfacing the settings screen unasked."""
+    return ui.Stack(children=[
+        ui.Empty(
+            message="Pick a media package on the left, or start a new "
+                    "brief to generate images.",
+        ),
+        ui.Button(
+            "+ New brief", icon="Plus", variant="primary",
+            on_click=ui.Call("__panel__studio", view="editor", package_id="new"),
+        ),
+    ], gap=4)

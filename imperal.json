@@ -1725,6 +1725,352 @@
       "owner_chat_tool": "media-studio"
     },
     {
+      "name": "check_new_models",
+      "description": "Check Magnific's own docs site right now for text-to-image models we don't support yet. Always records the result, whether or not anything new is found -- this is the same check that also runs automatically once a day.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No inputs -- this always checks the one known source (Magnific's\nown sitemap) against the one known registry (model_registry.MODELS).",
+        "properties": {},
+        "title": "CheckNewModelsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ModelDiscoveryFinding": {
+            "description": "One docs page the sitemap has that model_registry.MODELS doesn't --\na candidate model, NOT yet a usable one (see model_discovery.py for why\nthis never becomes a ModelSpec by itself).",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "slug": {
+                "default": "",
+                "title": "Slug",
+                "type": "string"
+              },
+              "docs_url": {
+                "default": "",
+                "title": "Docs Url",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "ModelDiscoveryFinding",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "Outcome of one daily/manual check run.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "checked_at": {
+            "default": "",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "source_reachable": {
+            "default": false,
+            "title": "Source Reachable",
+            "type": "boolean"
+          },
+          "known_model_count": {
+            "default": 0,
+            "title": "Known Model Count",
+            "type": "integer"
+          },
+          "new_candidates": {
+            "items": {
+              "$ref": "#/$defs/ModelDiscoveryFinding"
+            },
+            "title": "New Candidates",
+            "type": "array"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ModelDiscoveryResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.check_new_models",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "list_model_discovery_log",
+      "description": "Show the history of daily new-model checks -- every past run, whether or not it found anything, newest first.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "limit": {
+            "default": 30,
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListModelDiscoveryLogParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One past check, for `list_model_discovery_log` -- always recorded,\neven a run that reachably found nothing new.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "checked_at": {
+            "default": "",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "source_reachable": {
+            "default": false,
+            "title": "Source Reachable",
+            "type": "boolean"
+          },
+          "new_candidate_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "New Candidate Slugs",
+            "type": "array"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ModelDiscoveryLogEntry",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.list_model_discovery_log",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
       "name": "list_providers",
       "description": "List every image-generation provider Media Hub knows about, and whether each one is connected for this user.",
       "action_type": "read",
@@ -2075,7 +2421,12 @@
     }
   ],
   "signals": [],
-  "schedules": [],
+  "schedules": [
+    {
+      "name": "media_model_discovery",
+      "cron": "10 * * * *"
+    }
+  ],
   "required_scopes": [],
   "icon_size_bytes": 597,
   "lifecycle": {
@@ -2134,5 +2485,34 @@
       "refresh": "manual",
       "center_overlay": true
     }
-  ]
+  ],
+  "pricing": {
+    "model": "per_action",
+    "currency": "tokens",
+    "monthly_price": 0,
+    "tool_prices": {
+      "create_media_brief": 1,
+      "generate_media_package": 8,
+      "list_media_packages": 0,
+      "get_media_package": 0,
+      "regenerate_asset": 4,
+      "update_asset_meta": 1,
+      "delete_media_package": 2,
+      "check_new_models": 0,
+      "list_model_discovery_log": 0,
+      "list_providers": 0,
+      "connect_magnific": 0,
+      "disconnect_magnific": 0
+    },
+    "free_tools": [
+      "check_new_models",
+      "connect_magnific",
+      "disconnect_magnific",
+      "get_media_package",
+      "list_media_packages",
+      "list_model_discovery_log",
+      "list_providers"
+    ],
+    "notes": "SYNCHRONISED WITH THE PLATFORM. Prices live in pricing_config.tool_prices on the platform side; this block is their copy in the repo so the scale is visible in diffs and testable. Write them via developer.update_pricing (the app must be suspended first). Scale: 0 -- read-only or purely local (listing/inspecting existing data, provider connect/disconnect, the daily discovery log); 1 -- cheap write with no external image-generation call (create a draft brief, edit alt text/caption); 2 -- destructive but free (delete a package -- no Magnific call); 4 -- one real Magnific generation call for a single asset (regenerate_asset); 8 -- a full package generation, several Magnific calls in one go (generate_media_package is the only tool that actually spends the user's own Magnific quota on every call, so it is priced above every single-asset action)."
+  }
 }
