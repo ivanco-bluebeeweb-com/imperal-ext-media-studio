@@ -25,9 +25,27 @@ of quietly losing images.
 from __future__ import annotations
 
 import asyncio
+import base64
+
+import httpx
 
 BASE_URL = "https://api.magnific.com"
 CREATE_PATH = "/v1/ai/mystic"
+
+# Upscaler Creative -- confirmed via docs.magnific.com/api-reference/
+# image-upscaler-creative/{post-image-upscaler,get-image-upscaler}. This is
+# the ONLY upscaler endpoint used here (never *-precision or *-precision-v2):
+# both Precision endpoints are explicitly documented as "may modify the
+# original image content based on the prompt", which is wrong for a
+# dimension-only auto-upscale that must not change what the image shows.
+UPSCALE_CREATE_PATH = "/v1/ai/image-upscaler"
+UPSCALE_STATUS_PATH = "/v1/ai/image-upscaler/{task_id}"
+# Documented enum, smallest-first -- upscale_scale_factor_for() below picks
+# the smallest one that clears the pipeline's minimum-side threshold.
+UPSCALE_SCALE_FACTORS = (2, 4, 8, 16)
+# Documented hard cap on the OUTPUT image: "can't exceed maximum allowed
+# size of 25.3 million pixels" (post-image-upscaler schema for `image`).
+UPSCALE_MAX_OUTPUT_PIXELS = 25_300_000
 STATUS_PATH = "/v1/ai/mystic/{task_id}"
 
 # Statuses observed/documented across Magnific's async task endpoints
@@ -363,6 +381,154 @@ async def generate_image_with_model(
             )
     raise ProviderError(
         f"Magnific {spec.label} job did not finish within "
+        f"{max_polls * poll_interval_s:.0f}s.",
+        "MEDIA_PROVIDER_TIMEOUT",
+    )
+
+
+# --------------------------- Upscaler Creative (auto-upscale) ---------------------------
+#
+# WHY THIS DOWNLOADS BYTES WITH A PLAIN httpx.AsyncClient, NOT ctx.http.
+#
+# Confirmed live during development: the federal ctx.http client always
+# decodes a non-JSON response body through `resp.text` (see imperal_sdk's
+# HTTPClient._wrap) -- i.e. it treats binary image bytes as UTF-8 text. On a
+# real PNG/JPEG this corrupts the bytes (any byte >= 0x80 that isn't valid
+# UTF-8 gets replaced with U+FFFD), breaking both the PNG/JPEG header this
+# module needs to read AND the base64 payload the upscaler API requires.
+# Imperal's own docs (recipes/handle-user-api-keys) show a raw
+# `httpx.AsyncClient()` call inside a handler as a legitimate pattern
+# ("discouraged by convention, not banned by a validator") specifically for
+# this kind of binary/non-JSON traffic, and httpx is already a transitive
+# dependency of imperal-sdk itself -- so this adds no new dependency.
+async def download_image_bytes(url: str, *, timeout: float = 60) -> bytes:
+    """Fetch raw bytes from a URL (Magnific/Freepik's CDN) without corrupting
+    binary content. Raises ProviderError on any non-2xx response."""
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
+        resp = await client.get(url)
+    if not (200 <= resp.status_code < 300):
+        raise ProviderError(
+            f"Could not download the generated image for size checking "
+            f"(HTTP {resp.status_code}).",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    return resp.content
+
+
+def upscale_scale_factor_for(width: int, height: int, *, min_side: int = 1500) -> str | None:
+    """Pick the smallest documented scale_factor (2x/4x/8x/16x) that brings
+    the SMALLER side up to at least `min_side`, respecting the upscaler's
+    documented 25.3-megapixel output cap. Returns None when the image
+    already clears `min_side` on both sides, or when no legal factor can
+    clear it without breaching the output cap (skip, don't force a request
+    that Magnific would reject).
+
+    Only the smaller side needs to reach `min_side` -- "меньше чем 1500
+    пикселей в любую сторону" (the standing directive) means the trigger is
+    whichever side is smallest.
+    """
+    smaller_side = min(width, height)
+    if smaller_side >= min_side:
+        return None
+    for factor in UPSCALE_SCALE_FACTORS:
+        if smaller_side * factor < min_side:
+            continue
+        if (width * factor) * (height * factor) > UPSCALE_MAX_OUTPUT_PIXELS:
+            continue
+        return f"{factor}x"
+    return None
+
+
+async def create_upscale_job(ctx, api_key: str, image_bytes: bytes, scale_factor: str) -> str:
+    """POST /v1/ai/image-upscaler (Creative). `image` is REQUIRED base64 --
+    confirmed via the endpoint's own schema (type=string, format=byte); there
+    is no URL-input alternative on this field despite the "Image Input Best
+    Practices" guide recommending a URL when calling other Magnific tools --
+    that guide describes how developers OBTAIN good base64 (read the file
+    directly rather than re-encoding a canvas), not a different wire format.
+    """
+    body = {
+        "image": base64.b64encode(image_bytes).decode("ascii"),
+        "scale_factor": scale_factor,
+    }
+    resp = await ctx.http.post(
+        f"{BASE_URL}{UPSCALE_CREATE_PATH}",
+        headers=_headers(api_key),
+        json=body,
+        timeout=60,
+    )
+    if resp.status_code == 401:
+        raise ProviderError(
+            "Magnific rejected the API key (401) for the image upscaler.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    if not (200 <= resp.status_code < 300):
+        raise ProviderError(
+            f"Magnific upscaler create-job call failed (HTTP {resp.status_code}).",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    task_id = _extract_task_id(resp.json())
+    if not task_id:
+        raise ProviderError(
+            "Magnific accepted the upscale request but returned no task id.",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    return task_id
+
+
+async def get_upscale_job(ctx, api_key: str, task_id: str) -> dict:
+    """GET /v1/ai/image-upscaler/{task-id} -- same lifecycle vocabulary and
+    `{"data": {"generated": [...], "status": ...}}` wrapping as every other
+    Magnific async task endpoint, so the shared _extract_* helpers apply
+    unchanged."""
+    resp = await ctx.http.get(
+        f"{BASE_URL}{UPSCALE_STATUS_PATH.format(task_id=task_id)}",
+        headers=_headers(api_key),
+        timeout=30,
+    )
+    if not (200 <= resp.status_code < 300):
+        raise ProviderError(
+            f"Magnific upscaler status check failed (HTTP {resp.status_code}).",
+            "MEDIA_PROVIDER_ERROR",
+        )
+    body = resp.json()
+    status = _extract_status(body)
+    if status in DONE_STATUSES:
+        urls = _extract_image_urls(body)
+        if not urls:
+            raise ProviderError(
+                "Magnific reported the upscale job as done but returned no "
+                "image URLs.",
+                "MEDIA_PROVIDER_ERROR",
+            )
+        return {"state": "done", "image_urls": urls, "raw_status": status}
+    if status in FAILED_STATUSES:
+        return {"state": "failed", "image_urls": [], "raw_status": status}
+    return {"state": "pending", "image_urls": [], "raw_status": status or "unknown"}
+
+
+async def upscale_image(
+    ctx, api_key: str, image_bytes: bytes, scale_factor: str, *,
+    poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
+    max_polls: int = DEFAULT_MAX_POLLS,
+) -> str:
+    """Create + poll an Upscaler Creative job and return the resulting image
+    URL. Raises ProviderError on failure or timeout -- callers decide whether
+    that should fail the whole asset or just keep the original image."""
+    task_id = await create_upscale_job(ctx, api_key, image_bytes, scale_factor)
+    for _ in range(max_polls):
+        await asyncio.sleep(poll_interval_s)
+        result = await get_upscale_job(ctx, api_key, task_id)
+        if result["state"] == "done":
+            return result["image_urls"][0]
+        if result["state"] == "failed":
+            raise ProviderError(
+                f"Magnific reported the upscale job as failed "
+                f"(status={result['raw_status']}).",
+                "MEDIA_PROVIDER_ERROR",
+            )
+    raise ProviderError(
+        f"Magnific upscale job {task_id} did not finish within "
         f"{max_polls * poll_interval_s:.0f}s.",
         "MEDIA_PROVIDER_TIMEOUT",
     )

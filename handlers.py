@@ -33,6 +33,7 @@ from __future__ import annotations
 from imperal_sdk import ActionResult, sdl
 
 import codes as c
+import image_dims
 import magnific_client as mc
 import model_registry as mr
 import storage as st
@@ -131,6 +132,58 @@ async def _generate_asset_image(ctx, api_key: str, asset: dict, *, on_progress=N
             ctx, api_key, asset["prompt"], model="",
             aspect_ratio=ASPECT_RATIO_4_3, on_progress=on_progress,
         )
+
+
+# WHY AUTO-UPSCALE IS A BEST-EFFORT STEP, NOT A HARD FAILURE.
+#
+# Standing directive: any generated image smaller than 1500px on its
+# smaller side must be auto-upscaled via Magnific's Upscaler Creative
+# (images only -- video is explicitly out of scope for this pass). But the
+# upscaler is a SEPARATE provider call on top of an already-succeeded
+# generation: if the size check or the upscale call itself fails for any
+# reason (bad bytes, provider hiccup, unrecognized format), the asset
+# already has a perfectly good image -- failing the whole package/asset
+# over a size *optimization* would be strictly worse for the user than
+# quietly keeping the original. So every failure path here logs a warning
+# and returns the ORIGINAL url unchanged; only a clean upscale success
+# replaces it.
+async def _maybe_upscale_asset_image(ctx, api_key: str, image_url: str) -> str:
+    """If `image_url` points to an image smaller than 1500px on its smaller
+    side, upscale it via Magnific's Upscaler Creative and return the new
+    URL. Otherwise (already big enough, size unreadable, or the upscale
+    call fails) return `image_url` unchanged."""
+    if not image_url:
+        return image_url
+    try:
+        original_bytes = await mc.download_image_bytes(image_url)
+    except Exception:
+        await ctx.log(
+            "Could not download the generated image to check its size; "
+            "skipping auto-upscale for this asset.",
+            level="warning",
+        )
+        return image_url
+    dims = image_dims.get_image_dimensions(original_bytes)
+    if dims is None:
+        await ctx.log(
+            "Generated image isn't a recognized PNG/JPEG/WebP; skipping "
+            "auto-upscale for this asset.",
+            level="warning",
+        )
+        return image_url
+    width, height = dims
+    scale_factor = mc.upscale_scale_factor_for(width, height, min_side=1500)
+    if scale_factor is None:
+        return image_url
+    try:
+        return await mc.upscale_image(ctx, api_key, original_bytes, scale_factor)
+    except mc.ProviderError:
+        await ctx.log(
+            f"Auto-upscale failed for a {width}x{height} image; keeping the "
+            f"original.",
+            level="warning",
+        )
+        return image_url
 
 
 def _package_to_entity(row: dict) -> MediaPackage:
@@ -337,6 +390,7 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
                     f"Generating {asset.get('role', 'image')}...",
                 )
                 image_url = await _generate_asset_image(ctx, api_key, asset)
+                image_url = await _maybe_upscale_asset_image(ctx, api_key, image_url)
                 asset["image_url"] = image_url
                 asset["status"] = "ready"
                 asset["error"] = ""
@@ -509,6 +563,7 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
     async def work() -> ActionResult:
         try:
             image_url = await _generate_asset_image(ctx, api_key, target)
+            image_url = await _maybe_upscale_asset_image(ctx, api_key, image_url)
             target["image_url"] = image_url
             target["status"] = "ready"
             target["error"] = ""
