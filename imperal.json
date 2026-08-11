@@ -3244,6 +3244,7 @@
       "regenerate_asset": 20,
       "generate_asset_upscale": 20,
       "update_asset_meta": 8,
+      "delete_asset_image": 8,
       "delete_media_package": 8,
       "check_new_models": 12,
       "list_model_discovery_log": 0,
