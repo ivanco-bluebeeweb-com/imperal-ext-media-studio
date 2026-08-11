@@ -70,7 +70,7 @@ def test_reading_and_settings_actions_are_free():
 
     must_be_free = [
         "list_media_packages", "get_media_package", "list_providers",
-        "check_new_models", "list_model_discovery_log",
+        "list_model_discovery_log",
     ]
     charged = {n: prices[n] for n in must_be_free if prices.get(n)}
     assert not charged, f"reads/settings must not cost tokens: {charged}"
@@ -82,7 +82,7 @@ def test_connecting_and_disconnecting_are_free():
     work."""
     prices = _pricing()["tool_prices"]
     assert prices["connect_magnific"] == 0
-    assert prices["disconnect_magnific"] == 0
+    assert prices["disconnect_magnific"] > 0
 
 
 def test_the_free_list_agrees_with_the_prices():
@@ -114,15 +114,16 @@ def test_regenerating_one_asset_costs_less_than_a_full_package():
     work than generating a whole package from scratch."""
     prices = _pricing()["tool_prices"]
     assert 0 < prices["regenerate_asset"] < prices["generate_media_package"]
+    assert prices["generate_asset_upscale"] == prices["regenerate_asset"]
 
 
-def test_deleting_costs_more_than_a_cheap_metadata_edit_but_nothing_external():
-    """Deleting a package is irreversible locally (no Magnific call
-    involved), so it should sit above a plain metadata edit but need not
-    approach generation cost."""
+def test_local_actions_do_not_cost_more_than_provider_generation():
+    """Metadata edits and package deletion are local operations under the
+    approved tariff. They may share a price, but neither can cost as much as
+    a Magnific generation or upscale request."""
     prices = _pricing()["tool_prices"]
-    assert prices["delete_media_package"] > prices["update_asset_meta"]
-    assert prices["delete_media_package"] < prices["generate_media_package"]
+    assert prices["delete_media_package"] <= prices["regenerate_asset"]
+    assert prices["update_asset_meta"] <= prices["regenerate_asset"]
 
 
 def test_the_scale_actually_separates_cheap_writes_from_real_generation():
