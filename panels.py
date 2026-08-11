@@ -313,9 +313,7 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     else:
         image_children.append(ui.Text("Not generated yet.", variant="caption"))
 
-    display_format = asset.get("upscaled_format") or asset.get("original_format", "")
     image_title = asset.get("filename") or _asset_title(role)
-    title_line = image_title + (f" · {display_format}" if display_format else "")
     upscale_children: list[ui.UINode] = []
     if original_url and not url_expired:
         upscale_children.append(ui.Form(
@@ -336,12 +334,11 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
 
     metadata_children: list[ui.UINode] = [ui.Form(
         action="update_asset_meta",
-        submit_label="Save metadata",
+        submit_label="Save Changes",
         defaults={"package_id": package_id, "role": role},
         children=[
             ui.Text("Image title", variant="label"),
             ui.Input(param_name="image_title", placeholder="A clear file title", value=image_title),
-            ui.Text(title_line, variant="caption"),
             ui.Text("Image description", variant="label"),
             ui.TextArea(
                 param_name="image_description",
@@ -379,7 +376,6 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
         gap=2,
     ))
     return ui.Card(
-        title=f"{role_title} Image",
         content=ui.Stack(children=image_children, gap=2),
     )
 

@@ -45,16 +45,15 @@ def test_asset_card_labels_original_upscaled_and_metadata_clearly():
         "8x",
         "16x",
         "Image title",
-        "heat-pump-guide-featured · PNG",
         "A clear file title",
         "Describe the image to generate, in English",
-        "Save metadata",
+        "Save Changes",
         "Alt text",
         "Caption",
         "Image description",
     ):
         assert label in rendered
-    assert card.props["title"] == "Featured Image"
+    assert rendered.count("Featured Image") == 1
     assert "ready" in rendered.lower()
     assert rendered.index("Upscaling") < rendered.index("Metadata") < rendered.index("Regenerate")
     # Both URLs must remain present: the original is not silently discarded.
