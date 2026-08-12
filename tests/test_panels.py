@@ -117,6 +117,23 @@ async def test_central_brief_catalog_makes_existing_briefs_searchable(ctx_with_k
 
 
 @pytest.mark.asyncio
+async def test_existing_brief_has_compact_left_aligned_back_to_catalog_button(ctx_with_key, monkeypatch):
+    async def fake_package(_ctx, _package_id):
+        return {
+            "id": "brief-1", "article_title": "Heat recovery guide",
+            "site": "example.com", "status": "draft", "assets": [],
+        }
+
+    monkeypatch.setattr(panels.st, "get_package", fake_package)
+    node = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
+    rendered = repr(node)
+    assert "All media briefs" in rendered
+    assert "'size': 'sm'" in rendered
+    assert "'icon': 'ArrowLeft'" in rendered
+    assert "'view': ''" in rendered
+
+
+@pytest.mark.asyncio
 async def test_sidebar_is_settings_only_not_a_second_brief_catalog(ctx_with_key):
     node = await panels.packages_nav_panel(ctx_with_key)
     rendered = repr(node)

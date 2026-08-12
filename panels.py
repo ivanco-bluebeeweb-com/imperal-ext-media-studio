@@ -415,7 +415,13 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
     ]
     actions = ui.Stack(children=action_children, direction="h")
 
-    children: list[ui.UINode] = [header]
+    children: list[ui.UINode] = [
+        ui.Button(
+            "All media briefs", icon="ArrowLeft", variant="ghost", size="sm",
+            on_click=ui.Call("__panel__studio", view=""),
+        ),
+        header,
+    ]
     if not any_connected:
         children.append(ui.Alert(
             title="Connect Magnific to generate",
