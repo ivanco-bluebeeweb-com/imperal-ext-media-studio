@@ -764,6 +764,141 @@
       "owner_chat_tool": "media-studio"
     },
     {
+      "name": "create_project",
+      "description": "Register a new project (a connected site we make media briefs for) so it appears in the sidebar's project list immediately -- even before any brief has been created for it.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:project"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "site_id": {
+            "description": "Site id / domain for this project, e.g. 'g4s.md'.",
+            "title": "Site Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "Display name for the project. Empty = use site_id.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "site_id"
+        ],
+        "title": "CreateProjectParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One project = one connected site we make media briefs for.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site_id": {
+            "default": "",
+            "title": "Site Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "brief_count": {
+            "default": 0,
+            "title": "Brief Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "Project",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.create_project",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
       "name": "list_media_packages",
       "description": "List media packages, optionally filtered by site or status.",
       "action_type": "read",
@@ -3557,7 +3692,7 @@
       "title": "Media Hub",
       "tree": {},
       "icon": "",
-      "refresh": "on_event:media-studio.create_media_brief,media-studio.generate_media_package,media-studio.delete_media_package,media-studio.connect_magnific,media-studio.disconnect_magnific",
+      "refresh": "on_event:media-studio.create_media_brief,media-studio.generate_media_package,media-studio.delete_media_package,media-studio.connect_magnific,media-studio.disconnect_magnific,media-studio.create_project",
       "center_overlay": false,
       "default_width": 300,
       "min_width": 220,
@@ -3579,6 +3714,7 @@
     "monthly_price": 0,
     "tool_prices": {
       "create_media_brief": 12,
+      "create_project": 8,
       "generate_media_package": 35,
       "list_media_packages": 0,
       "get_media_package": 0,
