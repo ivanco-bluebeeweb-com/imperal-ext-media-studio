@@ -42,6 +42,19 @@ class ProviderConnection(sdl.Entity):
     detail: str = ""
 
 
+class CreateProjectParams(BaseModel):
+    site_id: str = Field(description="Site id / domain for this project, e.g. 'g4s.md'.")
+    name: str = Field("", description="Display name for the project. Empty = use site_id.")
+
+
+class Project(sdl.Entity):
+    """One project = one connected site we make media briefs for."""
+    site_id: str = ""
+    name: str = ""
+    brief_count: int = 0
+    created_at: str = ""
+
+
 class CreateMediaBriefParams(BaseModel):
     site: str = Field(
         "", description="Which site this article is for, e.g. 'g4s.md'. "

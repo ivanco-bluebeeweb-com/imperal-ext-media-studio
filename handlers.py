@@ -41,6 +41,7 @@ import storage as st
 from app import chat, ext
 from models import (
     CreateMediaBriefParams,
+    CreateProjectParams,
     DeleteAssetImageParams,
     DeleteMediaPackageParams,
     DeleteResult,
@@ -50,6 +51,7 @@ from models import (
     ListMediaPackagesParams,
     MediaAsset,
     MediaPackage,
+    Project,
     RegenerateAssetParams,
     RecoverStoredImagesParams,
     UpdateAssetMetaParams,
@@ -538,6 +540,30 @@ async def generate_media_package(ctx, params: GenerateMediaPackageParams) -> Act
         f"Started generating {len(row.get('assets', []))} image(s). "
         "I'll message you here when they're ready.",
     )
+
+
+@chat.function(
+    "create_project",
+    "Register a new project (a connected site we make media briefs for) so "
+    "it appears in the sidebar's project list immediately -- even before "
+    "any brief has been created for it.",
+    action_type="write",
+    data_model=Project,
+    event="media-studio.create_project",
+    effects=["create:project"],
+)
+async def create_project(ctx, params: CreateProjectParams) -> ActionResult:
+    """Create a project (site), rejecting a duplicate site_id."""
+    site_id = params.site_id.strip()
+    if not site_id:
+        return _error("site_id is required.", c.MEDIA_PROJECT_VALIDATION_FAILED)
+    created = await st.create_project(ctx, site_id, params.name.strip())
+    if created is None:
+        return _error(f"A project for '{site_id}' already exists.", c.MEDIA_PROJECT_ALREADY_EXISTS)
+    _project_id, data = created
+    entity = Project(id=_project_id, title=data["name"], site_id=data["site_id"],
+                      name=data["name"], brief_count=0, created_at=data.get("created_at", ""))
+    return ActionResult.success(entity, f"Project '{data['name']}' created.")
 
 
 @chat.function(

@@ -102,7 +102,7 @@ async def test_central_brief_catalog_contains_search_and_new_brief(ctx_with_key)
 
 @pytest.mark.asyncio
 async def test_central_brief_catalog_lists_existing_briefs(ctx_with_key, monkeypatch):
-    async def fake_packages(_ctx, *, limit):
+    async def fake_packages(_ctx, *, limit, site=""):
         return [{
             "id": "brief-1", "article_title": "Heat recovery guide",
             "site": "example.com", "status": "ready",
@@ -120,7 +120,7 @@ async def test_header_shows_live_brief_count_and_status_breakdown(ctx_with_key, 
     """The header must say how many briefs there are right now, and the
     subtitle must break them down by actual state (e.g. '1 ready, 1 draft'),
     not a generic 'search, open and manage' caption that says nothing."""
-    async def fake_packages(_ctx, *, limit):
+    async def fake_packages(_ctx, *, limit, site=""):
         return [
             {"id": "b1", "article_title": "A", "site": "x.com", "status": "ready", "assets": []},
             {"id": "b2", "article_title": "B", "site": "x.com", "status": "draft", "assets": []},
@@ -141,7 +141,7 @@ async def test_brief_list_is_client_side_searchable_not_a_submit_form(ctx_with_k
     loaded from the backend -- no submit button, no server round-trip per
     keystroke. `ui.List(searchable=True)` is the only component in this SDK
     that behaves that way; a separate ui.Input would only fire on Enter."""
-    async def fake_packages(_ctx, *, limit):
+    async def fake_packages(_ctx, *, limit, site=""):
         return [{
             "id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md",
             "status": "ready", "model": "imagen-4-fast", "assets": [{"status": "ready"}],
@@ -159,7 +159,7 @@ async def test_brief_search_meta_covers_model_and_ratio_so_they_are_findable(ctx
     """Typing a site, a brief title, a model name, or an asset ratio like
     '2/3' must all be able to find a brief -- so all of that has to actually
     be present as searchable text on the rendered item."""
-    async def fake_packages(_ctx, *, limit):
+    async def fake_packages(_ctx, *, limit, site=""):
         return [{
             "id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md",
             "status": "ready", "model": "imagen-4-fast",
@@ -180,7 +180,7 @@ async def test_new_brief_button_sits_directly_above_the_searchable_list(ctx_with
     """The SDK's List renders its own search box INSIDE itself, so an
     external button can't share that exact row -- but it must still sit
     immediately above the list, not buried somewhere else in the layout."""
-    async def fake_packages(_ctx, *, limit):
+    async def fake_packages(_ctx, *, limit, site=""):
         return []
 
     monkeypatch.setattr(panels.st, "list_packages", fake_packages)
@@ -200,7 +200,7 @@ async def test_new_brief_button_sits_directly_above_the_searchable_list(ctx_with
 async def test_new_brief_button_has_no_redundant_plus_glyph_in_label(ctx_with_key, monkeypatch):
     """The button already carries icon='Plus' -- the label text must not
     ALSO contain a literal '+' character."""
-    async def fake_packages(_ctx, *, limit):
+    async def fake_packages(_ctx, *, limit, site=""):
         return []
 
     monkeypatch.setattr(panels.st, "list_packages", fake_packages)
@@ -217,7 +217,7 @@ async def test_all_briefs_load_unfiltered_since_filtering_is_client_side(ctx_wit
     already sent from the backend -- studio_panel must NOT narrow the rows
     itself based on any query param; every brief must always be present in
     what gets rendered, letting the client-side search do the filtering."""
-    async def fake_packages(_ctx, *, limit):
+    async def fake_packages(_ctx, *, limit, site=""):
         return [
             {"id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md", "status": "ready", "assets": []},
             {"id": "b2", "article_title": "Ventilation basics", "site": "g4s.md", "status": "draft", "assets": []},
@@ -324,3 +324,135 @@ async def test_sidebar_is_settings_only_not_a_second_brief_catalog(ctx_with_key)
     assert "App settings" in rendered
     assert "New brief" not in rendered
     assert "searchable=True" not in rendered
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Sidebar "Projects" = existing connected sites, an "Add new project" Dialog,
+# and a project-scoped center brief catalogue (same look as _packages_view).
+# ──────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sidebar_shows_projects_section_with_add_button(ctx_with_key):
+    node = await panels.packages_nav_panel(ctx_with_key)
+    rendered = repr(node)
+    assert "Projects" in rendered
+    assert "Add new project" in rendered
+
+
+@pytest.mark.asyncio
+async def test_sidebar_projects_section_empty_state(ctx_with_key):
+    node = await panels.packages_nav_panel(ctx_with_key)
+    rendered = repr(node)
+    assert "No projects yet" in rendered
+
+
+@pytest.mark.asyncio
+async def test_creating_a_project_makes_it_appear_as_existing_project(ctx_with_key):
+    """A project registered via create_project shows up immediately in the
+    sidebar's Projects list -- even before it has any brief."""
+    import handlers
+    from models import CreateProjectParams
+
+    result = await handlers.create_project(ctx_with_key, CreateProjectParams(
+        site_id="klimtech.md", name="KlimTech"))
+    assert result.status == "success"
+
+    node = await panels.packages_nav_panel(ctx_with_key)
+    rendered = repr(node)
+    assert "KlimTech" in rendered
+    assert "klimtech.md" in rendered
+    assert "0 briefs" in rendered
+
+
+@pytest.mark.asyncio
+async def test_creating_duplicate_project_site_id_is_rejected(ctx_with_key):
+    import handlers
+    from models import CreateProjectParams
+
+    ok = await handlers.create_project(ctx_with_key, CreateProjectParams(site_id="g4s.md"))
+    assert ok.status == "success"
+    dup = await handlers.create_project(ctx_with_key, CreateProjectParams(site_id="g4s.md"))
+    assert dup.status == "error"
+
+
+@pytest.mark.asyncio
+async def test_existing_site_used_by_a_brief_appears_as_a_project_without_explicit_registration(
+    ctx_with_key, monkeypatch,
+):
+    """A site already referenced by a media package is an "already existing
+    project" even if nobody ever explicitly registered it -- the user's own
+    connected sites should show up automatically."""
+    async def fake_packages(_ctx, *, limit, site=""):
+        return [
+            {"id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md",
+             "status": "ready", "assets": []},
+        ]
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels.packages_nav_panel(ctx_with_key)
+    rendered = repr(node)
+    assert "g4s.md" in rendered
+    assert "1 briefs" in rendered
+
+
+@pytest.mark.asyncio
+async def test_add_project_button_opens_ui_dialog_with_expected_fields(ctx_with_key):
+    node = await panels.packages_nav_panel(ctx_with_key, show_add_project="1")
+    rendered = repr(node)
+    assert "type='Dialog'" in rendered
+    assert "Add new project" in rendered
+    assert "'param_name': 'site_id'" in rendered
+    assert "'param_name': 'name'" in rendered
+    assert "create_project" in rendered
+
+
+@pytest.mark.asyncio
+async def test_project_click_routes_center_panel_to_that_projects_briefs(ctx_with_key, monkeypatch):
+    async def fake_packages(_ctx, *, limit, site=""):
+        return [
+            {"id": "b1", "article_title": "Heat recovery guide", "site": "klimtech.md",
+             "status": "ready", "assets": []},
+        ]
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+
+    import handlers
+    from models import CreateProjectParams
+    await handlers.create_project(ctx_with_key, CreateProjectParams(
+        site_id="klimtech.md", name="KlimTech"))
+
+    sidebar = await panels.packages_nav_panel(ctx_with_key)
+    rendered = repr(sidebar)
+    assert "'site': 'klimtech.md'" in rendered
+    assert "__panel__studio" in rendered
+
+    center = await panels.studio_panel(ctx_with_key, site="klimtech.md")
+    center_rendered = repr(center)
+    assert "KlimTech · Briefs (1)" in center_rendered
+
+
+@pytest.mark.asyncio
+async def test_project_scoped_center_view_looks_like_the_normal_catalog(ctx_with_key, monkeypatch):
+    """Same shape as the unscoped catalogue -- header+breakdown, New brief
+    button, searchable list -- just retitled and filtered.
+
+    list_packages is called twice here: once unfiltered (by list_projects,
+    to compute each project's brief_count for the sidebar) and once scoped
+    to site='klimtech.md' (for the actual filtered catalogue rows) -- so the
+    fake must branch on `site` rather than assert a single fixed value.
+    """
+    async def fake_packages(_ctx, *, limit, site=""):
+        if site == "klimtech.md":
+            return [
+                {"id": "b1", "article_title": "Heat recovery guide", "site": "klimtech.md",
+                 "status": "ready", "assets": []},
+            ]
+        return []
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels.studio_panel(ctx_with_key, site="klimtech.md")
+    rendered = repr(node)
+    assert "Briefs (1)" in rendered
+    assert "New brief" in rendered
+    assert "'searchable': True" in rendered
+    assert "Heat recovery guide" in rendered

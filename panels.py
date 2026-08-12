@@ -78,6 +78,60 @@ def _asset_progress(assets: list[dict]) -> str:
 
 # ── Left sidebar ──────────────────────────────────────────────────────────────
 
+async def _projects_section(ctx, site: str, show_add_project: str) -> ui.UINode:
+    """'Projects' = the sites we already work on -- every distinct `site`
+    value already used by a media package, PLUS any project registered
+    explicitly via the 'Add new project' dialog even before its first
+    brief exists. Shown as a clickable list so a project is always one
+    click away; clicking one routes the center panel to that project's
+    brief catalogue (studio_panel(site=...)), styled exactly like the
+    existing packages catalogue -- just scoped and re-titled.
+    """
+    projects = await st.list_projects(ctx)
+
+    project_items = [
+        ui.ListItem(
+            id=p["site_id"],
+            title=p["name"],
+            subtitle=p["site_id"] if p["name"] != p["site_id"] else "",
+            meta=f"{p['brief_count']} briefs",
+            selected=(p["site_id"] == site and bool(site)),
+            on_click=ui.Call("__panel__studio", site=p["site_id"]),
+        )
+        for p in projects
+    ]
+
+    add_project_button = ui.Button(
+        "➕ Add new project", variant="secondary", size="sm", full_width=True,
+        on_click=ui.Call("__panel__packages_nav", site=site, show_add_project="1"),
+    )
+
+    children: list[ui.UINode] = [add_project_button]
+    if project_items:
+        children.append(ui.List(items=project_items, searchable=True))
+    else:
+        children.append(ui.Empty(message="No projects yet — add one to get started.", icon="🗂️"))
+
+    if show_add_project:
+        children.append(
+            ui.Dialog(
+                title="Add new project",
+                content=ui.Stack(
+                    direction="v", gap=2,
+                    children=[
+                        ui.Input(param_name="site_id", placeholder="Site id, e.g. g4s.md"),
+                        ui.Input(param_name="name", placeholder="Display name (optional)"),
+                    ],
+                ),
+                confirm_label="Add project",
+                cancel_label="Cancel",
+                on_confirm=ui.Call("create_project"),
+            )
+        )
+
+    return ui.Card(title="Projects", content=ui.Stack(direction="v", gap=2, children=children))
+
+
 @ext.panel(
     "packages_nav",
     slot="left",
@@ -87,10 +141,10 @@ def _asset_progress(assets: list[dict]) -> str:
     max_width=420,
     refresh="on_event:media-studio.create_media_brief,media-studio.generate_media_package,"
             "media-studio.delete_media_package,media-studio.connect_magnific,"
-            "media-studio.disconnect_magnific",
+            "media-studio.disconnect_magnific,media-studio.create_project",
 )
-async def packages_nav_panel(ctx) -> ui.UINode:
-    """Package list PLUS a permanent connection-status row.
+async def packages_nav_panel(ctx, site: str = "", show_add_project: str = "", **kwargs) -> ui.UINode:
+    """Projects list PLUS a permanent connection-status row.
 
     The status row is the fix for "I don't understand how to connect
     Magnific from the interface": it is visible every time this panel
@@ -99,6 +153,8 @@ async def packages_nav_panel(ctx) -> ui.UINode:
     """
     connections = await list_provider_connections(ctx)
     any_connected = any(c.connected for c in connections)
+
+    projects_section = await _projects_section(ctx, site, show_add_project)
 
     status_row = ui.Card(
         title="Providers",
@@ -114,7 +170,7 @@ async def packages_nav_panel(ctx) -> ui.UINode:
         ], direction="h"),
     )
 
-    return ui.Stack(children=[status_row], gap=3)
+    return ui.Stack(children=[projects_section, status_row], gap=3)
 
 
 # ── App settings screen -- EVERYTHING configurable, one place ──────────────
@@ -350,7 +406,7 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     )
 
 
-def _editor_new(ctx, any_connected: bool) -> ui.UINode:
+def _editor_new(ctx, any_connected: bool, site: str = "") -> ui.UINode:
     children: list[ui.UINode] = [ui.Header(text="New media brief", level=3)]
 
     if not any_connected:
@@ -369,7 +425,7 @@ def _editor_new(ctx, any_connected: bool) -> ui.UINode:
         action="create_media_brief",
         submit_label="Create brief",
         children=[
-            ui.Input(param_name="site", placeholder="Site, e.g. g4s.md"),
+            ui.Input(param_name="site", placeholder="Site, e.g. g4s.md", value=site),
             ui.Input(param_name="article_title", placeholder="Article title"),
             ui.TextArea(param_name="summary", placeholder="Short summary / angle",
                         rows=4),
@@ -382,7 +438,7 @@ def _editor_new(ctx, any_connected: bool) -> ui.UINode:
         ],
     ))
     children.append(ui.Button("Cancel", variant="ghost",
-                              on_click=ui.Call("__panel__studio", view="", package_id="")))
+                              on_click=ui.Call("__panel__studio", view="", package_id="", site=site)))
 
     return ui.Stack(children=children, gap=4)
 
@@ -457,9 +513,13 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
     Notion/Asana Connector's center panel -- instead of an empty editor.
     `connect`/`providers` are accepted as aliases for `settings` so any old
     bookmarked ui.Call still lands somewhere sensible.
+
+    `site` scopes the packages view to one project's briefs (set by clicking
+    a project in the sidebar); empty means "every brief", same as before.
     """
     view = str(kwargs.get("view") or "").strip().lower()
     package_id = str(kwargs.get("package_id") or "").strip()
+    site = str(kwargs.get("site") or "").strip()
 
     connections = await list_provider_connections(ctx)
     any_connected = any(c.connected for c in connections)
@@ -469,10 +529,10 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
         return _settings_view(ctx, connections, log)
     if view == "editor" or package_id:
         if not package_id or package_id == "new":
-            return _editor_new(ctx, any_connected)
+            return _editor_new(ctx, any_connected, site=site)
         return await _editor_existing(ctx, package_id, any_connected)
 
-    return await _packages_view(ctx, any_connected)
+    return await _packages_view(ctx, any_connected, site=site)
 
 
 _STATUS_ORDER = ["ready", "generating", "partial", "draft", "failed"]
@@ -505,8 +565,10 @@ def _brief_meta(row: dict) -> str:
     return " \u00b7 ".join(bits)
 
 
-async def _packages_view(ctx, any_connected: bool) -> ui.UINode:
-    """Central catalogue of every media brief.
+async def _packages_view(ctx, any_connected: bool, site: str = "") -> ui.UINode:
+    """Central catalogue of media briefs -- every brief, or (when `site` is
+    given) just one project's briefs. Visually identical either way: only
+    the header text and the underlying query change.
 
     Browsing, search and selection belong to the content area, where there is
     room for them. The left sidebar deliberately contains only app-level
@@ -523,16 +585,26 @@ async def _packages_view(ctx, any_connected: bool) -> ui.UINode:
     that slot doesn't exist in this SDK. The "New brief" button instead sits
     directly above the list, as close to it as layout allows.
     """
-    rows = await st.list_packages(ctx, limit=100)
+    rows = await st.list_packages(ctx, site=site, limit=100)
     total = len(rows)
 
+    if site:
+        projects = await st.list_projects(ctx)
+        project = next((p for p in projects if p["site_id"] == site), None)
+        project_label = project["name"] if project else site
+        header_text = f"{project_label} · Briefs ({total})"
+    else:
+        header_text = f"Media briefs ({total})"
+
+    new_brief_action = ui.Call("__panel__studio", view="editor", package_id="new", site=site)
+
     children: list[ui.UINode] = [
-        ui.Header(text=f"Media briefs ({total})", level=2,
+        ui.Header(text=header_text, level=2,
                    subtitle=_status_breakdown(rows)),
         ui.Stack(children=[
             ui.Button(
                 "New brief", icon="Plus", variant="primary",
-                on_click=ui.Call("__panel__studio", view="editor", package_id="new"),
+                on_click=new_brief_action,
             ),
         ], direction="h", justify="end"),
     ]
