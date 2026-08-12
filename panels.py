@@ -472,27 +472,58 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
             return _editor_new(ctx, any_connected)
         return await _editor_existing(ctx, package_id, any_connected)
 
-    return await _packages_view(ctx, any_connected)
+    return await _packages_view(ctx, any_connected, query=str(kwargs.get("q") or "").strip())
 
 
-async def _packages_view(ctx, any_connected: bool) -> ui.UINode:
+_STATUS_ORDER = ["ready", "generating", "partial", "draft", "failed"]
+
+
+def _status_breakdown(rows: list[dict]) -> str:
+    """'15 ready, 1 draft, 2 failed' -- a live summary of every state a
+    brief can be in, not a guess at what "search" might mean."""
+    if not rows:
+        return "No briefs yet."
+    counts: dict[str, int] = {}
+    for row in rows:
+        status = row.get("status") or "draft"
+        counts[status] = counts.get(status, 0) + 1
+    parts = [f"{counts.pop(s)} {s}" for s in _STATUS_ORDER if s in counts]
+    parts += [f"{n} {s}" for s, n in counts.items()]
+    return ", ".join(parts)
+
+
+async def _packages_view(ctx, any_connected: bool, query: str = "") -> ui.UINode:
     """Central catalogue of every media brief.
 
     Browsing, search and selection belong to the content area, where there is
     room for them. The left sidebar deliberately contains only app-level
     provider/settings controls.
+
+    WHY OUR OWN SEARCH BOX, NOT `ui.List(searchable=True)` (same reasoning as
+    SEO Audit Engine's `_sites_view`): the List component renders its search
+    input as part of its own body, right above its items -- so any toolbar
+    placed before the List (like the "New brief" button here) visibly floats
+    ABOVE that search box instead of sitting next to it. Putting our own
+    ui.Input in the SAME ui.Stack as the button is the only way to guarantee
+    they land on one row.
     """
+    rows = await st.list_packages(ctx, limit=100)
+    total = len(rows)
+
     children: list[ui.UINode] = [
-        ui.Header(
-            text="Media briefs", level=2,
-            subtitle="Search, open and manage every generated image brief.",
-        ),
+        ui.Header(text=f"Media briefs ({total})", level=2,
+                   subtitle=_status_breakdown(rows)),
         ui.Stack(children=[
+            ui.Input(
+                placeholder="Search by title or site...",
+                param_name="q", value=query,
+                on_submit=ui.Call("__panel__studio", view="", package_id=""),
+            ),
             ui.Button(
-                "+ New brief", icon="Plus", variant="primary",
+                "New brief", icon="Plus", variant="primary",
                 on_click=ui.Call("__panel__studio", view="editor", package_id="new"),
             ),
-        ], direction="h", justify="end"),
+        ], direction="h", justify="between"),
     ]
 
     if not any_connected:
@@ -502,11 +533,21 @@ async def _packages_view(ctx, any_connected: bool) -> ui.UINode:
             type="warning",
         ))
 
-    rows = await st.list_packages(ctx, limit=100)
+    filtered = rows
+    if query:
+        q = query.lower()
+        filtered = [
+            row for row in rows
+            if q in (row.get("article_title") or "").lower()
+            or q in (row.get("site") or "").lower()
+        ]
+
     if not rows:
         children.append(ui.Empty(
             message="No media briefs yet. Create one to prepare a featured image and inline images.",
         ))
+    elif not filtered:
+        children.append(ui.Empty(message=f"No briefs match \"{query}\"."))
     else:
         items = [
             ui.ListItem(
@@ -522,8 +563,8 @@ async def _packages_view(ctx, any_connected: bool) -> ui.UINode:
                     "confirm": f"Delete media package '{row.get('article_title') or row['id']}'?",
                 }],
             )
-            for row in rows
+            for row in filtered
         ]
-        children.append(ui.List(items=items, searchable=True))
+        children.append(ui.List(items=items, searchable=False))
 
     return ui.Stack(children=children, gap=4)

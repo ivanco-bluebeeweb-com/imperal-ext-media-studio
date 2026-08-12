@@ -101,7 +101,7 @@ async def test_central_brief_catalog_contains_search_and_new_brief(ctx_with_key)
 
 
 @pytest.mark.asyncio
-async def test_central_brief_catalog_makes_existing_briefs_searchable(ctx_with_key, monkeypatch):
+async def test_central_brief_catalog_lists_existing_briefs(ctx_with_key, monkeypatch):
     async def fake_packages(_ctx, *, limit):
         return [{
             "id": "brief-1", "article_title": "Heat recovery guide",
@@ -113,7 +113,87 @@ async def test_central_brief_catalog_makes_existing_briefs_searchable(ctx_with_k
     node = await panels._packages_view(ctx_with_key, any_connected=True)
     rendered = repr(node)
     assert "Heat recovery guide" in rendered
-    assert "'searchable': True" in rendered
+
+
+@pytest.mark.asyncio
+async def test_header_shows_live_brief_count_and_status_breakdown(ctx_with_key, monkeypatch):
+    """The header must say how many briefs there are right now, and the
+    subtitle must break them down by actual state (e.g. '1 ready, 1 draft'),
+    not a generic 'search, open and manage' caption that says nothing."""
+    async def fake_packages(_ctx, *, limit):
+        return [
+            {"id": "b1", "article_title": "A", "site": "x.com", "status": "ready", "assets": []},
+            {"id": "b2", "article_title": "B", "site": "x.com", "status": "draft", "assets": []},
+        ]
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels._packages_view(ctx_with_key, any_connected=True)
+    rendered = repr(node)
+    assert "Media briefs (2)" in rendered
+    assert "1 ready" in rendered
+    assert "1 draft" in rendered
+    assert "Search, open and manage" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_new_brief_button_and_search_are_on_the_same_row(ctx_with_key, monkeypatch):
+    """The button must sit in the same horizontal Stack as the search
+    input, not stacked above it."""
+    async def fake_packages(_ctx, *, limit):
+        return []
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels._packages_view(ctx_with_key, any_connected=True)
+
+    def _find_row_with(node, label):
+        props = getattr(node, "props", {})
+        children = props.get("children") or []
+        rendered_children = repr(children)
+        if props.get("direction") == "h" and label in rendered_children:
+            return children
+        for child in children:
+            found = _find_row_with(child, label)
+            if found is not None:
+                return found
+        return None
+
+    row = _find_row_with(node, "New brief")
+    assert row is not None, "expected an 'h' Stack containing the New brief button"
+    row_repr = repr(row)
+    assert "New brief" in row_repr
+    assert "Search by title" in row_repr
+
+
+@pytest.mark.asyncio
+async def test_new_brief_button_has_no_redundant_plus_glyph_in_label(ctx_with_key, monkeypatch):
+    """The button already carries icon='Plus' -- the label text must not
+    ALSO contain a literal '+' character."""
+    async def fake_packages(_ctx, *, limit):
+        return []
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels._packages_view(ctx_with_key, any_connected=True)
+    rendered = repr(node)
+    assert "'label': 'New brief'" in rendered
+    assert "'label': '+ New brief'" not in rendered
+    assert "icon': 'Plus'" in rendered
+
+
+@pytest.mark.asyncio
+async def test_search_query_actually_filters_the_rendered_list(ctx_with_key, monkeypatch):
+    """Not just that the input renders -- that submitting a query through
+    studio_panel's real routing narrows down which briefs show up."""
+    async def fake_packages(_ctx, *, limit):
+        return [
+            {"id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md", "status": "ready", "assets": []},
+            {"id": "b2", "article_title": "Ventilation basics", "site": "g4s.md", "status": "draft", "assets": []},
+        ]
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels.studio_panel(ctx_with_key, view="", package_id="", q="heat")
+    rendered = repr(node)
+    assert "Heat recovery guide" in rendered
+    assert "Ventilation basics" not in rendered
 
 
 @pytest.mark.asyncio
