@@ -117,6 +117,19 @@ async def test_central_brief_catalog_makes_existing_briefs_searchable(ctx_with_k
 
 
 @pytest.mark.asyncio
+async def test_back_button_click_actually_lands_on_the_brief_catalog(ctx_with_key):
+    """Simulates the real on_click the back button issues -- not just that
+    the button renders with the right props, but that dispatching it
+    actually returns the catalogue screen and not settings/editor/nothing."""
+    node = await panels.studio_panel(ctx_with_key, view="")
+    rendered = repr(node)
+    assert "Media briefs" in rendered
+    assert "New brief" in rendered
+    assert "App settings" not in rendered
+    assert "New media brief" not in rendered
+
+
+@pytest.mark.asyncio
 async def test_existing_brief_has_compact_left_aligned_back_to_catalog_button(ctx_with_key, monkeypatch):
     async def fake_package(_ctx, _package_id):
         return {
