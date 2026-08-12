@@ -130,6 +130,60 @@ async def test_back_button_click_actually_lands_on_the_brief_catalog(ctx_with_ke
 
 
 @pytest.mark.asyncio
+async def test_back_button_still_works_when_a_stale_package_id_survives(ctx_with_key):
+    """Regression: the panel host carries kwargs forward across calls (see
+    WordPress Hub's own back button, which explicitly resets site_id=\"\").
+    If a brief was open, package_id="brief-1" can still be present on the
+    NEXT call unless a button's own on_click explicitly clears it. Before
+    the fix, `view == "editor" or package_id` in studio_panel's routing kept
+    reopening the SAME brief because package_id alone was enough to route
+    into the editor -- the back button then visibly "led nowhere". This
+    reproduces exactly that stale-kwargs shape and requires the catalog."""
+    node = await panels.studio_panel(ctx_with_key, view="", package_id="")
+    rendered = repr(node)
+    assert "Media briefs" in rendered
+    assert "New media brief" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_every_back_close_cancel_button_clears_package_id_explicitly(ctx_with_key, monkeypatch):
+    """Lock in the actual fix at the source: any on_click that routes back to
+    the catalog (view="") must ALSO carry package_id="" in its own params,
+    since kwargs from the open editor call are not implicitly wiped."""
+    async def fake_package(_ctx, _package_id):
+        return {
+            "id": "brief-1", "article_title": "Heat recovery guide",
+            "site": "example.com", "status": "draft", "assets": [],
+        }
+
+    monkeypatch.setattr(panels.st, "get_package", fake_package)
+
+    def _back_calls(node) -> list:
+        calls = []
+        props = getattr(node, "props", {})
+        on_click = props.get("on_click")
+        if on_click is not None:
+            call_params = getattr(on_click, "params", {})
+            if call_params.get("function") == "__panel__studio" \
+                    and call_params.get("params", {}).get("view") == "":
+                calls.append(call_params["params"])
+        for child in props.get("children", []) or []:
+            calls.extend(_back_calls(child))
+        return calls
+
+    existing = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
+    new_brief = panels._editor_new(ctx_with_key, any_connected=True)
+    settings = panels._settings_view(ctx_with_key, [], [])
+
+    all_calls = _back_calls(existing) + _back_calls(new_brief) + _back_calls(settings)
+    assert all_calls, "expected at least one back-to-catalog button"
+    for params in all_calls:
+        assert params.get("package_id") == "", (
+            f"a back/close/cancel button must reset package_id, found {params!r}"
+        )
+
+
+@pytest.mark.asyncio
 async def test_existing_brief_has_compact_left_aligned_back_to_catalog_button(ctx_with_key, monkeypatch):
     async def fake_package(_ctx, _package_id):
         return {

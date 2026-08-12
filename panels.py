@@ -227,7 +227,7 @@ def _settings_view(ctx, connections: list, log: list[dict]) -> ui.UINode:
 
     children.append(ui.Button(
         "Close", variant="ghost",
-        on_click=ui.Call("__panel__studio", view=""),
+        on_click=ui.Call("__panel__studio", view="", package_id=""),
     ))
 
     return ui.Stack(children=children, gap=4)
@@ -382,7 +382,7 @@ def _editor_new(ctx, any_connected: bool) -> ui.UINode:
         ],
     ))
     children.append(ui.Button("Cancel", variant="ghost",
-                              on_click=ui.Call("__panel__studio", view="")))
+                              on_click=ui.Call("__panel__studio", view="", package_id="")))
 
     return ui.Stack(children=children, gap=4)
 
@@ -411,7 +411,7 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
             on_click=ui.Call("generate_media_package", package_id=package_id),
         ),
         ui.Button("Close", variant="ghost",
-                  on_click=ui.Call("__panel__studio", view="")),
+                  on_click=ui.Call("__panel__studio", view="", package_id="")),
     ]
     actions = ui.Stack(children=action_children, direction="h")
 
@@ -419,7 +419,7 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
         ui.Stack(children=[
             ui.Button(
                 "All media briefs", icon="ArrowLeft", variant="ghost", size="sm",
-                on_click=ui.Call("__panel__studio", view=""),
+                on_click=ui.Call("__panel__studio", view="", package_id=""),
             ),
         ], direction="h", justify="start"),
         header,
