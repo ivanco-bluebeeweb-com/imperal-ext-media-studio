@@ -472,7 +472,7 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
             return _editor_new(ctx, any_connected)
         return await _editor_existing(ctx, package_id, any_connected)
 
-    return await _packages_view(ctx, any_connected, query=str(kwargs.get("q") or "").strip())
+    return await _packages_view(ctx, any_connected)
 
 
 _STATUS_ORDER = ["ready", "generating", "partial", "draft", "failed"]
@@ -492,20 +492,36 @@ def _status_breakdown(rows: list[dict]) -> str:
     return ", ".join(parts)
 
 
-async def _packages_view(ctx, any_connected: bool, query: str = "") -> ui.UINode:
+def _brief_meta(row: dict) -> str:
+    """Everything worth typing into search, rendered as the item's visible
+    meta line: asset progress (e.g. '2/3 ready'), the model, and the status
+    word -- so typing a model name or a ratio like '1/1' finds a brief too,
+    not just its title or site."""
+    bits = [_asset_progress(row.get("assets", []))]
+    model = row.get("model") or ""
+    if model:
+        bits.append(model)
+    bits.append(row.get("status") or "draft")
+    return " \u00b7 ".join(bits)
+
+
+async def _packages_view(ctx, any_connected: bool) -> ui.UINode:
     """Central catalogue of every media brief.
 
     Browsing, search and selection belong to the content area, where there is
     room for them. The left sidebar deliberately contains only app-level
     provider/settings controls.
 
-    WHY OUR OWN SEARCH BOX, NOT `ui.List(searchable=True)` (same reasoning as
-    SEO Audit Engine's `_sites_view`): the List component renders its search
-    input as part of its own body, right above its items -- so any toolbar
-    placed before the List (like the "New brief" button here) visibly floats
-    ABOVE that search box instead of sitting next to it. Putting our own
-    ui.Input in the SAME ui.Stack as the button is the only way to guarantee
-    they land on one row.
+    WHY `ui.List(searchable=True)`, NOT OUR OWN SEARCH INPUT. The user wants
+    real as-you-type filtering over the FULL list already loaded from the
+    backend -- no submit button, no server round-trip per keystroke. This SDK
+    has exactly one component that behaves that way: `ui.List(searchable=True)`
+    filters client-side over items already on the page. A standalone
+    `ui.Input` here only fires `on_submit` (Enter), which is a step backwards.
+    The tradeoff (documented, not hidden): the List's own search box renders
+    INSIDE the List, so it cannot share a row with an external button --
+    that slot doesn't exist in this SDK. The "New brief" button instead sits
+    directly above the list, as close to it as layout allows.
     """
     rows = await st.list_packages(ctx, limit=100)
     total = len(rows)
@@ -514,16 +530,11 @@ async def _packages_view(ctx, any_connected: bool, query: str = "") -> ui.UINode
         ui.Header(text=f"Media briefs ({total})", level=2,
                    subtitle=_status_breakdown(rows)),
         ui.Stack(children=[
-            ui.Input(
-                placeholder="Search by title or site...",
-                param_name="q", value=query,
-                on_submit=ui.Call("__panel__studio", view="", package_id=""),
-            ),
             ui.Button(
                 "New brief", icon="Plus", variant="primary",
                 on_click=ui.Call("__panel__studio", view="editor", package_id="new"),
             ),
-        ], direction="h", justify="between"),
+        ], direction="h", justify="end"),
     ]
 
     if not any_connected:
@@ -533,28 +544,17 @@ async def _packages_view(ctx, any_connected: bool, query: str = "") -> ui.UINode
             type="warning",
         ))
 
-    filtered = rows
-    if query:
-        q = query.lower()
-        filtered = [
-            row for row in rows
-            if q in (row.get("article_title") or "").lower()
-            or q in (row.get("site") or "").lower()
-        ]
-
     if not rows:
         children.append(ui.Empty(
             message="No media briefs yet. Create one to prepare a featured image and inline images.",
         ))
-    elif not filtered:
-        children.append(ui.Empty(message=f"No briefs match \"{query}\"."))
     else:
         items = [
             ui.ListItem(
                 id=row["id"],
                 title=row.get("article_title") or "(untitled brief)",
                 subtitle=row.get("site", "") or "No site specified",
-                meta=_asset_progress(row.get("assets", [])),
+                meta=_brief_meta(row),
                 badge=_status_badge(row.get("status", "draft")),
                 on_click=ui.Call("__panel__studio", view="editor", package_id=row["id"]),
                 actions=[{
@@ -563,8 +563,8 @@ async def _packages_view(ctx, any_connected: bool, query: str = "") -> ui.UINode
                     "confirm": f"Delete media package '{row.get('article_title') or row['id']}'?",
                 }],
             )
-            for row in filtered
+            for row in rows
         ]
-        children.append(ui.List(items=items, searchable=False))
+        children.append(ui.List(items=items, searchable=True))
 
     return ui.Stack(children=children, gap=4)

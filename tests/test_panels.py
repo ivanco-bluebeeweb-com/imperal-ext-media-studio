@@ -136,32 +136,64 @@ async def test_header_shows_live_brief_count_and_status_breakdown(ctx_with_key, 
 
 
 @pytest.mark.asyncio
-async def test_new_brief_button_and_search_are_on_the_same_row(ctx_with_key, monkeypatch):
-    """The button must sit in the same horizontal Stack as the search
-    input, not stacked above it."""
+async def test_brief_list_is_client_side_searchable_not_a_submit_form(ctx_with_key, monkeypatch):
+    """The user wants real as-you-type filtering over the full list already
+    loaded from the backend -- no submit button, no server round-trip per
+    keystroke. `ui.List(searchable=True)` is the only component in this SDK
+    that behaves that way; a separate ui.Input would only fire on Enter."""
+    async def fake_packages(_ctx, *, limit):
+        return [{
+            "id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md",
+            "status": "ready", "model": "imagen-4-fast", "assets": [{"status": "ready"}],
+        }]
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels._packages_view(ctx_with_key, any_connected=True)
+    rendered = repr(node)
+    assert "'searchable': True" in rendered
+    assert "Search by title" not in rendered  # no separate submit-driven input
+
+
+@pytest.mark.asyncio
+async def test_brief_search_meta_covers_model_and_ratio_so_they_are_findable(ctx_with_key, monkeypatch):
+    """Typing a site, a brief title, a model name, or an asset ratio like
+    '2/3' must all be able to find a brief -- so all of that has to actually
+    be present as searchable text on the rendered item."""
+    async def fake_packages(_ctx, *, limit):
+        return [{
+            "id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md",
+            "status": "ready", "model": "imagen-4-fast",
+            "assets": [{"status": "ready"}, {"status": "ready"}, {"status": "pending"}],
+        }]
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels._packages_view(ctx_with_key, any_connected=True)
+    rendered = repr(node)
+    assert "g4s.md" in rendered
+    assert "Heat recovery guide" in rendered
+    assert "imagen-4-fast" in rendered
+    assert "2/3 ready" in rendered
+
+
+@pytest.mark.asyncio
+async def test_new_brief_button_sits_directly_above_the_searchable_list(ctx_with_key, monkeypatch):
+    """The SDK's List renders its own search box INSIDE itself, so an
+    external button can't share that exact row -- but it must still sit
+    immediately above the list, not buried somewhere else in the layout."""
     async def fake_packages(_ctx, *, limit):
         return []
 
     monkeypatch.setattr(panels.st, "list_packages", fake_packages)
     node = await panels._packages_view(ctx_with_key, any_connected=True)
-
-    def _find_row_with(node, label):
-        props = getattr(node, "props", {})
-        children = props.get("children") or []
-        rendered_children = repr(children)
-        if props.get("direction") == "h" and label in rendered_children:
-            return children
-        for child in children:
-            found = _find_row_with(child, label)
-            if found is not None:
-                return found
-        return None
-
-    row = _find_row_with(node, "New brief")
-    assert row is not None, "expected an 'h' Stack containing the New brief button"
-    row_repr = repr(row)
-    assert "New brief" in row_repr
-    assert "Search by title" in row_repr
+    children = node.props.get("children") or []
+    button_idx = next(
+        i for i, c in enumerate(children)
+        if "New brief" in repr(c)
+    )
+    # Nothing but (optionally) a connect-provider alert sits between the
+    # button row and the list/empty-state that follows it.
+    rest = children[button_idx + 1:]
+    assert any("Empty" in repr(c) or "'searchable'" in repr(c) for c in rest)
 
 
 @pytest.mark.asyncio
@@ -180,9 +212,11 @@ async def test_new_brief_button_has_no_redundant_plus_glyph_in_label(ctx_with_ke
 
 
 @pytest.mark.asyncio
-async def test_search_query_actually_filters_the_rendered_list(ctx_with_key, monkeypatch):
-    """Not just that the input renders -- that submitting a query through
-    studio_panel's real routing narrows down which briefs show up."""
+async def test_all_briefs_load_unfiltered_since_filtering_is_client_side(ctx_with_key, monkeypatch):
+    """Filtering now happens inside the List component on the full dataset
+    already sent from the backend -- studio_panel must NOT narrow the rows
+    itself based on any query param; every brief must always be present in
+    what gets rendered, letting the client-side search do the filtering."""
     async def fake_packages(_ctx, *, limit):
         return [
             {"id": "b1", "article_title": "Heat recovery guide", "site": "g4s.md", "status": "ready", "assets": []},
@@ -190,10 +224,10 @@ async def test_search_query_actually_filters_the_rendered_list(ctx_with_key, mon
         ]
 
     monkeypatch.setattr(panels.st, "list_packages", fake_packages)
-    node = await panels.studio_panel(ctx_with_key, view="", package_id="", q="heat")
+    node = await panels.studio_panel(ctx_with_key, view="", package_id="")
     rendered = repr(node)
     assert "Heat recovery guide" in rendered
-    assert "Ventilation basics" not in rendered
+    assert "Ventilation basics" in rendered
 
 
 @pytest.mark.asyncio
