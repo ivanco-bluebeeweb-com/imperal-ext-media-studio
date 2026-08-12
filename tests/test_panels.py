@@ -144,6 +144,9 @@ async def test_existing_brief_has_compact_left_aligned_back_to_catalog_button(ct
     assert "'size': 'sm'" in rendered
     assert "'icon': 'ArrowLeft'" in rendered
     assert "'view': ''" in rendered
+    # Left-aligned and compact, not stretched full-width.
+    assert "'justify': 'start'" in rendered
+    assert "'full_width': True" not in rendered
 
 
 @pytest.mark.asyncio

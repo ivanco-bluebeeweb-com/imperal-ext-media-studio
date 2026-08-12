@@ -416,10 +416,12 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
     actions = ui.Stack(children=action_children, direction="h")
 
     children: list[ui.UINode] = [
-        ui.Button(
-            "All media briefs", icon="ArrowLeft", variant="ghost", size="sm",
-            on_click=ui.Call("__panel__studio", view=""),
-        ),
+        ui.Stack(children=[
+            ui.Button(
+                "All media briefs", icon="ArrowLeft", variant="ghost", size="sm",
+                on_click=ui.Call("__panel__studio", view=""),
+            ),
+        ], direction="h", justify="start"),
         header,
     ]
     if not any_connected:
