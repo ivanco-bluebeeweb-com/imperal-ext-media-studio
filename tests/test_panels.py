@@ -79,18 +79,47 @@ async def test_old_connect_and_providers_views_still_resolve_to_settings(ctx):
 
 
 @pytest.mark.asyncio
-async def test_disconnected_first_run_lands_on_settings_not_a_dead_end(ctx):
-    """A first-time user with nothing connected must land on App settings
-    by default -- not an empty package list with no clue what to do."""
+async def test_default_view_is_the_central_brief_catalog_even_without_provider(ctx):
+    """The main workspace is always the brief catalogue. A disconnected
+    provider is an inline warning, not a detour into settings."""
     node = await panels.studio_panel(ctx)
-    assert "App settings" in repr(node)
+    rendered = repr(node)
+    assert "Media briefs" in rendered
+    assert "Connect a provider to generate images" in rendered
+    assert "Image provider" not in rendered
 
 
 @pytest.mark.asyncio
-async def test_connected_user_default_view_is_not_a_stale_settings_screen(ctx_with_key):
-    """Once connected, the bare default view should NOT be the settings
-    screen every time -- that was the old '_providers_view as the landing
-    page' behaviour. It should point at picking/starting a package."""
+async def test_central_brief_catalog_contains_search_and_new_brief(ctx_with_key):
+    """Browsing is on-page: not hidden in the left sidebar or replaced by
+    the former 'Pick a media package on the left' empty state."""
     node = await panels.studio_panel(ctx_with_key)
     rendered = repr(node)
+    assert "Media briefs" in rendered
     assert "New brief" in rendered
+    assert "Pick a media package on the left" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_central_brief_catalog_makes_existing_briefs_searchable(ctx_with_key, monkeypatch):
+    async def fake_packages(_ctx, *, limit):
+        return [{
+            "id": "brief-1", "article_title": "Heat recovery guide",
+            "site": "example.com", "status": "ready",
+            "assets": [{"status": "ready"}],
+        }]
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels._packages_view(ctx_with_key, any_connected=True)
+    rendered = repr(node)
+    assert "Heat recovery guide" in rendered
+    assert "'searchable': True" in rendered
+
+
+@pytest.mark.asyncio
+async def test_sidebar_is_settings_only_not_a_second_brief_catalog(ctx_with_key):
+    node = await panels.packages_nav_panel(ctx_with_key)
+    rendered = repr(node)
+    assert "App settings" in rendered
+    assert "New brief" not in rendered
+    assert "searchable=True" not in rendered

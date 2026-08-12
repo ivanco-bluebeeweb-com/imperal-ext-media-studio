@@ -114,52 +114,7 @@ async def packages_nav_panel(ctx) -> ui.UINode:
         ], direction="h"),
     )
 
-    header = ui.Stack(children=[
-        ui.Button(
-            "+ New brief", icon="Plus", variant="primary",
-            disabled=not any_connected,
-            on_click=ui.Call("__panel__studio", view="editor", package_id="new"),
-        ),
-    ], direction="h", justify="end")
-
-    children: list[ui.UINode] = [status_row]
-
-    if not any_connected:
-        children.append(ui.Alert(
-            title="Connect a provider to generate images",
-            message="Media packages can be drafted without a provider, but "
-                     "generating images needs Magnific connected first.",
-            type="warning",
-        ))
-
-    rows = await st.list_packages(ctx, limit=100)
-    children.append(header)
-
-    if not rows:
-        children.append(ui.Empty(
-            message="No media packages yet -- create a brief to generate a "
-                    "featured image plus inline images.",
-        ))
-    else:
-        items = [
-            ui.ListItem(
-                id=r["id"],
-                title=r.get("article_title") or "(untitled brief)",
-                subtitle=r.get("site", ""),
-                meta=_asset_progress(r.get("assets", [])),
-                badge=_status_badge(r.get("status", "draft")),
-                on_click=ui.Call("__panel__studio", view="editor", package_id=r["id"]),
-                actions=[{
-                    "icon": "Trash2",
-                    "on_click": ui.Call("delete_media_package", package_id=r["id"]),
-                    "confirm": f"Delete media package '{r.get('article_title') or r['id']}'?",
-                }],
-            )
-            for r in rows
-        ]
-        children.append(ui.List(items=items, searchable=True))
-
-    return ui.Stack(children=children, gap=3)
+    return ui.Stack(children=[status_row], gap=3)
 
 
 # ── App settings screen -- EVERYTHING configurable, one place ──────────────
@@ -509,24 +464,58 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
             return _editor_new(ctx, any_connected)
         return await _editor_existing(ctx, package_id, any_connected)
 
+    return await _packages_view(ctx, any_connected)
+
+
+async def _packages_view(ctx, any_connected: bool) -> ui.UINode:
+    """Central catalogue of every media brief.
+
+    Browsing, search and selection belong to the content area, where there is
+    room for them. The left sidebar deliberately contains only app-level
+    provider/settings controls.
+    """
+    children: list[ui.UINode] = [
+        ui.Header(
+            text="Media briefs", level=2,
+            subtitle="Search, open and manage every generated image brief.",
+        ),
+        ui.Stack(children=[
+            ui.Button(
+                "+ New brief", icon="Plus", variant="primary",
+                on_click=ui.Call("__panel__studio", view="editor", package_id="new"),
+            ),
+        ], direction="h", justify="end"),
+    ]
+
     if not any_connected:
-        log = await md.list_log(ctx, limit=5)
-        return _settings_view(ctx, connections, log)
-    return _default_view()
+        children.append(ui.Alert(
+            title="Connect a provider to generate images",
+            message="You can still create briefs. Connect Magnific in App settings before generating images.",
+            type="warning",
+        ))
 
+    rows = await st.list_packages(ctx, limit=100)
+    if not rows:
+        children.append(ui.Empty(
+            message="No media briefs yet. Create one to prepare a featured image and inline images.",
+        ))
+    else:
+        items = [
+            ui.ListItem(
+                id=row["id"],
+                title=row.get("article_title") or "(untitled brief)",
+                subtitle=row.get("site", "") or "No site specified",
+                meta=_asset_progress(row.get("assets", [])),
+                badge=_status_badge(row.get("status", "draft")),
+                on_click=ui.Call("__panel__studio", view="editor", package_id=row["id"]),
+                actions=[{
+                    "icon": "Trash2",
+                    "on_click": ui.Call("delete_media_package", package_id=row["id"]),
+                    "confirm": f"Delete media package '{row.get('article_title') or row['id']}'?",
+                }],
+            )
+            for row in rows
+        ]
+        children.append(ui.List(items=items, searchable=True))
 
-def _default_view() -> ui.UINode:
-    """Landing state for a connected user with no package/settings view
-    picked yet -- point at the two things that actually do something
-    (pick a package on the left, or start a new brief) instead of
-    surfacing the settings screen unasked."""
-    return ui.Stack(children=[
-        ui.Empty(
-            message="Pick a media package on the left, or start a new "
-                    "brief to generate images.",
-        ),
-        ui.Button(
-            "+ New brief", icon="Plus", variant="primary",
-            on_click=ui.Call("__panel__studio", view="editor", package_id="new"),
-        ),
-    ], gap=4)
+    return ui.Stack(children=children, gap=4)
