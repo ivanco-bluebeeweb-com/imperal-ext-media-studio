@@ -408,13 +408,17 @@ async def test_create_media_brief_invalid_model_rejected(ctx):
 
 @pytest.mark.asyncio
 async def test_create_media_brief_omitted_model_uses_third_party_auto_policy(ctx):
-    """No explicit model is now intentionally third-party-first, not Mystic."""
+    """No explicit model is now intentionally third-party-first, not Mystic.
+
+    Imagen 4 Ultra/Fast are deliberately absent from this set -- standing
+    user directive, see model_registry.DISABLED_MODEL_IDS.
+    """
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=1),
     )
     assert result.status == "success"
     assert result.data.model == "auto"
-    assert all(a.model in {"imagen4-ultra", "imagen4-fast", "gemini-2.5-flash"}
+    assert all(a.model in {"nano-banana-pro", "nano-banana-pro-flash", "gemini-2.5-flash"}
                for a in result.data.assets)
 
 

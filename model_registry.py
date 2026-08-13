@@ -477,9 +477,34 @@ MODELS: dict[str, ModelSpec] = {
 }
 
 # New briefs must never silently begin on Magnific's own Mystic model.
-# ``auto`` is resolved to one of the third-party Google models below; Mystic
+# ``auto`` is resolved to one of the third-party models below; Mystic
 # remains callable only as the technical-failure fallback or an explicit choice.
-DEFAULT_MODEL_ID = "imagen4-ultra"
+#
+# WHY GOOGLE IMAGEN 4 ULTRA/FAST ARE NO LONGER PICKED -- OR PICKABLE.
+#
+# Standing user directive (2026-08-13): Imagen 4 Ultra/Fast output quality is
+# rejected outright ("плохой" -- bad); they must never be used again, for any
+# user, and the fix must live in the shared pipeline, not a one-off manual
+# pick. So both entry points are closed at the source:
+#   1. `pick_model` (below) never returns either id any more.
+#   2. `DISABLED_MODEL_IDS` blocks them from being chosen EXPLICITLY too --
+#      `shared.is_valid_model_choice` rejects them with MEDIA_INVALID_MODEL,
+#      the same error path as any other unknown model id.
+# Their `ModelSpec` rows stay in `MODELS` on purpose: `recovery.py` still
+# needs their `create_path`/`status_path` to read back ALREADY-GENERATED
+# legacy packages that used them before this directive -- that is a
+# read-only historical lookup, never a new generation, so it is unaffected
+# by the ban. Nano Banana Pro / Nano Banana Pro Flash replace them in the
+# picker below: same hero-vs-fast tiering, both Google-backed, both already
+# confirmed rows in this registry (see the 2026-08-11 expansion above).
+DEFAULT_MODEL_ID = "nano-banana-pro"
+
+#: Model ids that must never be used for a NEW generation, for any user --
+#: kept OUT of `pick_model`'s possible outputs and rejected as an explicit
+#: choice by `shared.is_valid_model_choice`. Their rows stay in `MODELS`
+#: only so `recovery.py` can still read back pre-existing legacy packages
+#: that were generated with them before this ban.
+DISABLED_MODEL_IDS = frozenset({"imagen4-fast", "imagen4-ultra"})
 
 # Legacy Mystic-only sub-styles (see shared.MYSTIC_MODELS) stay valid ONLY
 # when the chosen model id is "mystic" -- they are Mystic's own style
@@ -489,6 +514,15 @@ DEFAULT_MODEL_ID = "imagen4-ultra"
 
 def is_known_model(model_id: str) -> bool:
     return model_id == "" or model_id in MODELS
+
+
+def is_selectable_model(model_id: str) -> bool:
+    """True for a model id a NEW generation may actually use -- known AND
+    not on the `DISABLED_MODEL_IDS` ban list. `is_known_model` alone still
+    says True for a disabled id (recovery.py legitimately needs that), so
+    this is the check any code path choosing a model for FUTURE work must
+    use instead."""
+    return is_known_model(model_id) and model_id not in DISABLED_MODEL_IDS
 
 
 def get_model(model_id: str) -> ModelSpec:
@@ -518,17 +552,20 @@ def pick_model(role: str, prompt: str, style_direction: str) -> str:
 
     Rules, in priority order:
     1. Portrait/people cues -> Gemini 2.5 Flash.
-    2. Featured role -> Imagen 4 Ultra.
-    3. Inline/illustrative/diagram and all remaining work -> Imagen 4 Fast.
+    2. Featured role -> Nano Banana Pro (hero/professional tier).
+    3. Inline/illustrative/diagram and all remaining work -> Nano Banana Pro
+       Flash (fast tier).
 
-    The policy intentionally returns a third-party model in every automatic
-    case. Mystic is *not* a quality default: handlers retry it only after the
-    selected third-party endpoint fails technically.
+    Google Imagen 4 Ultra/Fast are deliberately never returned here -- see
+    `DISABLED_MODEL_IDS`'s docstring above for why. The policy still always
+    returns a third-party model, never Mystic: Mystic is *not* a quality
+    default, handlers retry it only after the selected third-party endpoint
+    fails technically.
     """
     text = f"{prompt} {style_direction}".lower()
 
     if any(h in text for h in _PORTRAIT_HINTS):
         return "gemini-2.5-flash"
     if role == "featured":
-        return "imagen4-ultra"
-    return "imagen4-fast"
+        return "nano-banana-pro"
+    return "nano-banana-pro-flash"

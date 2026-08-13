@@ -46,11 +46,16 @@ declared secret, one more `_xxx_connection()` builder, and one more entry in
    `draft` package with one `pending` asset per role (`featured`, `inline_1`,
    `inline_2`, ...) and a role-appropriate prompt already built. By default,
    **`model="auto"`** selects a third-party model available *through*
-   Magnific: Google Imagen 4 Ultra for featured images, Imagen 4 Fast for
-   ordinary inline images, and Gemini 2.5 Flash for people/portrait cues.
-   A specific available model may still be chosen explicitly. Magnific's own
-   Mystic is never the silent default; it is used only when explicitly chosen
-   or when the selected third-party endpoint fails technically.
+   Magnific: Google Nano Banana Pro for featured images, Nano Banana Pro
+   Flash for ordinary inline images, and Gemini 2.5 Flash for people/portrait
+   cues. A specific available model may still be chosen explicitly. **Google
+   Imagen 4 Ultra/Fast are permanently excluded from selection** (standing
+   quality directive) — neither the auto picker nor an explicit `model=`
+   request can select them; `MEDIA_INVALID_MODEL` is returned for an explicit
+   attempt. Their legacy asset records remain readable for recovery only.
+   Magnific's own Mystic is never the silent default; it is used only when
+   explicitly chosen or when the selected third-party endpoint fails
+   technically.
 2. **`generate_media_package`** — generates every pending asset for a
    package. Runs in the background (`ctx.background_task`): you get an
    immediate acknowledgement, then a follow-up message when it's done. A

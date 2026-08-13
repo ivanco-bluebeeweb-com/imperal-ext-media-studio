@@ -78,15 +78,28 @@ VALID_TEXT_POLICIES = (TEXT_POLICY_NO_TEXT, TEXT_POLICY_ALLOW_TEXT)
 def is_valid_model_choice(model: str) -> bool:
     """True for everything `model` is now allowed to be: empty (Mystic
     default), a Mystic sub-style, \"auto\" (automatic model selection --
-    see model_registry.pick_model), or an id from the multi-provider
-    registry (mystic/imagen4-fast/imagen4-ultra/gemini-2.5-flash)."""
-    return is_valid_model(model) or model == "auto" or mr.is_known_model(model)
+    see model_registry.pick_model), or a SELECTABLE id from the
+    multi-provider registry (mystic/gemini-2.5-flash/nano-banana-pro/...).
+
+    Google Imagen 4 Ultra/Fast are deliberately EXCLUDED here even though
+    their rows still exist in `mr.MODELS` -- standing user directive, see
+    model_registry.DISABLED_MODEL_IDS's docstring. Using
+    `mr.is_selectable_model` instead of `mr.is_known_model` is what makes an
+    explicit `model=\"imagen4-ultra\"` (or -fast) request fail with
+    MEDIA_INVALID_MODEL exactly like any other unregistered id, for every
+    caller (create_media_brief, regenerate_asset)."""
+    return is_valid_model(model) or model == "auto" or mr.is_selectable_model(model)
 
 
 def valid_model_choices_hint() -> str:
-    """Human-readable list of every legal `model` value, for error messages."""
+    """Human-readable list of every legal `model` value, for error messages.
+
+    Disabled ids (see model_registry.DISABLED_MODEL_IDS) are deliberately
+    left out -- they must not be suggested as a valid choice either."""
     mystic = ", ".join(MYSTIC_MODELS)
-    registry = ", ".join(m for m in mr.MODELS if m != "mystic")
+    registry = ", ".join(
+        m for m in mr.MODELS if m != "mystic" and m not in mr.DISABLED_MODEL_IDS
+    )
     return (
         f"Mystic styles ({mystic}), a specific model ({registry}), "
         f"'auto' to let Media Hub pick automatically, or omit it for "

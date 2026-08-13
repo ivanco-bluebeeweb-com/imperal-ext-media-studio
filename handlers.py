@@ -101,12 +101,15 @@ async def _generate_asset_image(ctx, api_key: str, asset: dict, *, on_progress=N
     -> the original Mystic-only path (byte-for-byte, so every existing test
     and behaviour is unchanged) -- now with the pipeline-wide 4:3 landscape
     aspect ratio (shared.ASPECT_RATIO_4_3) forwarded on every call, since
-    every blogpost image must be 4:3 landscape (standing directive; Imagen4's
-    body builder in model_registry.py carries the same constant). Any OTHER
-    registered model id (imagen4-fast, imagen4-ultra, gemini-2.5-flash) ->
-    the new generic multi-provider path, whose body is built per-model in
-    model_registry.py (Gemini has no aspect_ratio field at all -- documented
-    exception, not an oversight).
+    every blogpost image must be 4:3 landscape (standing directive; most
+    registry models' body builders in model_registry.py carry the same
+    constant). Any OTHER registered model id (nano-banana-pro,
+    gemini-2.5-flash, flux-2-pro, seedream-4.5, ...) -> the new generic
+    multi-provider path, whose body is built per-model in model_registry.py
+    (Gemini has no aspect_ratio field at all -- documented exception, not an
+    oversight). Google Imagen 4 Ultra/Fast are registered but no longer
+    SELECTABLE for a new asset -- see model_registry.DISABLED_MODEL_IDS;
+    their rows only still exist so recovery.py can read back legacy assets.
     """
     model = asset.get("model", "")
     if is_valid_model(model):

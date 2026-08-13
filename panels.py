@@ -45,12 +45,16 @@ import model_registry as mr
 from providers import list_provider_connections
 from shared import MYSTIC_MODELS
 
+# Google Imagen 4 Ultra/Fast are excluded here on purpose -- standing user
+# directive (see model_registry.DISABLED_MODEL_IDS). Their ModelSpec rows
+# stay in mr.MODELS only for recovery.py's historical lookups; they must
+# never appear as a choosable option in this dropdown.
 _MODEL_OPTIONS = (
     [{"value": "", "label": "Mystic default"},
      {"value": "auto", "label": "Auto (Media Hub picks the best model)"}]
     + [{"value": m, "label": m.replace("_", " ")} for m in MYSTIC_MODELS]
     + [{"value": m_id, "label": spec.label} for m_id, spec in mr.MODELS.items()
-       if m_id != "mystic"]
+       if m_id != "mystic" and m_id not in mr.DISABLED_MODEL_IDS]
 )
 
 _MAGNIFIC_SIGNUP_URL = "https://www.magnific.com/api"

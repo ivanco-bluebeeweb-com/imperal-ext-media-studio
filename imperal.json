@@ -4,7 +4,7 @@
   "app_id": "media-studio",
   "version": "1.1.0",
   "name": "Media Hub",
-  "description": "Turn an article brief into a ready-to-publish image package -- featured image plus inline supporting images, with alt text -- using your own Magnific API key. Supports multiple AI image models (Magnific Mystic, Google Imagen 4 Fast/Ultra, Google Gemini 2.5 Flash) plus an automatic 'auto' model picker that matches the model to the image's role and prompt.",
+  "description": "Turn an article brief into a ready-to-publish image package -- featured image plus inline supporting images, with alt text -- using your own Magnific API key. Supports multiple AI image models (Magnific Mystic, Google Nano Banana Pro/Flash, Google Gemini 2.5 Flash, Flux, Seedream and more) plus an automatic 'auto' model picker that matches the model to the image's role and prompt. Google Imagen 4 Ultra/Fast are excluded from selection.",
   "icon": "icon.svg",
   "actions_explicit": true,
   "system": false,
@@ -70,7 +70,7 @@
           },
           "model": {
             "default": "auto",
-            "description": "Which model to use for every asset in this brief. Default 'auto' selects a third-party model available through Magnific (Google Imagen or Gemini) for every asset. Choose a specific model when needed. Mystic is reserved for the automatic technical-failure fallback or an explicit user choice; it is never the silent default.",
+            "description": "Which model to use for every asset in this brief. Default 'auto' selects a third-party model available through Magnific (e.g. Google Nano Banana Pro/Flash, Gemini, Flux, Seedream) matched to the image's role and prompt. Choose a specific model when needed. Google Imagen 4 Ultra/Fast are not selectable (either automatically or explicitly). Mystic is reserved for the automatic technical-failure fallback or an explicit user choice; it is never the silent default.",
             "title": "Model",
             "type": "string"
           },
@@ -3651,6 +3651,12 @@
   ],
   "required_scopes": [],
   "icon_size_bytes": 597,
+  "exposed": [
+    {
+      "name": "register_project",
+      "action_type": "write"
+    }
+  ],
   "lifecycle": {
     "health_check": {
       "interval_sec": 60

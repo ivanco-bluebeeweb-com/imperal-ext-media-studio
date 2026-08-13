@@ -29,9 +29,10 @@ ext = Extension(
         "Turn an article brief into a ready-to-publish image package -- "
         "featured image plus inline supporting images, with alt text -- using "
         "your own Magnific API key. Supports multiple AI image models "
-        "(Magnific Mystic, Google Imagen 4 Fast/Ultra, Google Gemini 2.5 "
-        "Flash) plus an automatic 'auto' model picker that matches the model "
-        "to the image's role and prompt."
+        "(Magnific Mystic, Google Nano Banana Pro/Flash, Google Gemini 2.5 "
+        "Flash, Flux, Seedream and more) plus an automatic 'auto' model "
+        "picker that matches the model to the image's role and prompt. "
+        "Google Imagen 4 Ultra/Fast are excluded from selection."
     ),
     icon="icon.svg",
     actions_explicit=True,

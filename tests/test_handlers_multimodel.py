@@ -42,24 +42,26 @@ async def test_create_media_brief_auto_resolves_portrait_prompt_to_gemini(ctx):
 
 
 @pytest.mark.asyncio
-async def test_create_media_brief_auto_resolves_featured_to_imagen_ultra(ctx):
+async def test_create_media_brief_auto_resolves_featured_to_nano_banana_pro(ctx):
+    """Nano Banana Pro replaces Imagen 4 Ultra as the featured-role pick --
+    standing user directive, see model_registry.DISABLED_MODEL_IDS."""
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(
             article_title="Ventilation systems", summary="a professional photo of ducts",
             inline_count=0, model="auto",
         ),
     )
-    assert result.data.assets[0].model == "imagen4-ultra"
+    assert result.data.assets[0].model == "nano-banana-pro"
 
 
 @pytest.mark.asyncio
 async def test_create_media_brief_accepts_specific_registry_model(ctx):
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
-                                     model="imagen4-fast"),
+                                     model="nano-banana-pro-flash"),
     )
     assert result.status == "success"
-    assert result.data.assets[0].model == "imagen4-fast"
+    assert result.data.assets[0].model == "nano-banana-pro-flash"
     assert result.data.assets[0].provider == "google"
 
 
@@ -74,12 +76,35 @@ async def test_create_media_brief_still_rejects_truly_unknown_model(ctx):
 
 
 @pytest.mark.asyncio
+async def test_create_media_brief_rejects_explicit_imagen4_ultra(ctx):
+    """Standing user directive: Imagen 4 Ultra/Fast must be rejected as an
+    EXPLICIT choice too, not just skipped by auto -- same error path as any
+    other unknown model id."""
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
+                                     model="imagen4-ultra"),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_INVALID_MODEL
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_rejects_explicit_imagen4_fast(ctx):
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
+                                     model="imagen4-fast"),
+    )
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_INVALID_MODEL
+
+
+@pytest.mark.asyncio
 async def test_generate_media_package_routes_registry_model_through_generic_path(
     ctx_with_key, monkeypatch,
 ):
     brief = await h.create_media_brief(
         ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
-                                              model="imagen4-ultra"),
+                                              model="nano-banana-pro"),
     )
     calls = []
 
@@ -91,7 +116,7 @@ async def test_generate_media_package_routes_registry_model_through_generic_path
     await h.generate_media_package(
         ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
     )
-    assert calls == ["imagen4-ultra"]
+    assert calls == ["nano-banana-pro"]
     final = await h.get_media_package(ctx_with_key, __import__("models").GetMediaPackageParams(
         package_id=brief.data.id))
     assert final.data.assets[0].image_url == "https://cdn.example/routed.png"
@@ -103,7 +128,7 @@ async def test_generate_media_package_falls_back_to_mystic_only_after_third_part
 ):
     brief = await h.create_media_brief(
         ctx_with_key, CreateMediaBriefParams(article_title="T", summary="S", inline_count=0,
-                                              model="imagen4-ultra"),
+                                              model="nano-banana-pro"),
     )
     calls = []
 
@@ -120,7 +145,7 @@ async def test_generate_media_package_falls_back_to_mystic_only_after_third_part
     await h.generate_media_package(
         ctx_with_key, GenerateMediaPackageParams(package_id=brief.data.id),
     )
-    assert calls == [("third_party", "imagen4-ultra"), ("mystic", "")]
+    assert calls == [("third_party", "nano-banana-pro"), ("mystic", "")]
 
 
 @pytest.mark.asyncio

@@ -91,10 +91,12 @@ class CreateMediaBriefParams(BaseModel):
     model: str = Field(
         "auto", description="Which model to use for every asset in this brief. "
                         "Default 'auto' selects a third-party model available through "
-                        "Magnific (Google Imagen or Gemini) for every asset. Choose a "
-                        "specific model when needed. Mystic is reserved for the automatic "
-                        "technical-failure fallback or an explicit user choice; it is never "
-                        "the silent default.")
+                        "Magnific (e.g. Google Nano Banana Pro/Flash, Gemini, Flux, "
+                        "Seedream) matched to the image's role and prompt. Choose a "
+                        "specific model when needed. Google Imagen 4 Ultra/Fast are not "
+                        "selectable (either automatically or explicitly). Mystic is "
+                        "reserved for the automatic technical-failure fallback or an "
+                        "explicit user choice; it is never the silent default.")
     lang: str = Field(
         "", description="The POST's own language code, e.g. 'ru', 'ro', 'en' -- "
                         "used for alt text/caption wording, which must match the "

@@ -6,6 +6,8 @@ import model_registry as mr
 def test_is_known_model_accepts_empty_and_registered():
     assert mr.is_known_model("")
     assert mr.is_known_model("mystic")
+    # imagen4-fast/-ultra stay KNOWN (recovery.py still reads legacy
+    # packages that used them) even though they are no longer SELECTABLE.
     assert mr.is_known_model("imagen4-fast")
     assert mr.is_known_model("imagen4-ultra")
     assert mr.is_known_model("gemini-2.5-flash")
@@ -16,16 +18,34 @@ def test_is_known_model_rejects_unregistered():
     assert not mr.is_known_model("not-a-model")
 
 
-def test_get_model_defaults_to_third_party_imagen():
-    assert mr.get_model("").id == "imagen4-ultra"
-    assert mr.get_model("bogus-id-not-in-registry") is mr.MODELS["imagen4-ultra"]
+def test_imagen4_disabled_for_new_selection_standing_directive():
+    """Standing user directive: Imagen 4 Ultra/Fast must never be used for
+    a NEW generation again, for any user -- known but not selectable."""
+    assert not mr.is_selectable_model("imagen4-fast")
+    assert not mr.is_selectable_model("imagen4-ultra")
+    assert "imagen4-fast" in mr.DISABLED_MODEL_IDS
+    assert "imagen4-ultra" in mr.DISABLED_MODEL_IDS
+
+
+def test_is_selectable_model_accepts_everything_else():
+    assert mr.is_selectable_model("")
+    assert mr.is_selectable_model("mystic")
+    assert mr.is_selectable_model("gemini-2.5-flash")
+    assert mr.is_selectable_model("nano-banana-pro")
+    assert not mr.is_selectable_model("not-a-model")
+
+
+def test_get_model_defaults_to_nano_banana_pro():
+    """DEFAULT_MODEL_ID moved off Imagen 4 Ultra -- see DISABLED_MODEL_IDS."""
+    assert mr.get_model("").id == "nano-banana-pro"
+    assert mr.get_model("bogus-id-not-in-registry") is mr.MODELS["nano-banana-pro"]
 
 
 def test_get_model_returns_the_right_spec():
-    spec = mr.get_model("imagen4-ultra")
-    assert spec.id == "imagen4-ultra"
-    assert spec.create_path == "/v1/ai/text-to-image/imagen4-ultra"
-    assert spec.status_path == "/v1/ai/text-to-image/imagen4-ultra/{task_id}"
+    spec = mr.get_model("nano-banana-pro")
+    assert spec.id == "nano-banana-pro"
+    assert spec.create_path == "/v1/ai/text-to-image/nano-banana-pro"
+    assert spec.status_path == "/v1/ai/text-to-image/nano-banana-pro/{task_id}"
 
 
 def test_every_model_spec_builds_a_body_with_the_prompt():
@@ -59,8 +79,8 @@ def test_gemini_body_has_no_aspect_ratio_field_documented_exception():
 # --------------------------- pick_model (auto) ---------------------------
 
 def test_pick_model_illustrative_cue_uses_third_party_model():
-    assert mr.pick_model("featured", "a clean diagram of airflow", "") == "imagen4-ultra"
-    assert mr.pick_model("inline_1", "a simple icon", "infographic style") == "imagen4-fast"
+    assert mr.pick_model("featured", "a clean diagram of airflow", "") == "nano-banana-pro"
+    assert mr.pick_model("inline_1", "a simple icon", "infographic style") == "nano-banana-pro-flash"
 
 
 def test_pick_model_portrait_cue_prefers_gemini():
@@ -68,17 +88,30 @@ def test_pick_model_portrait_cue_prefers_gemini():
     assert mr.pick_model("featured", "our team of workers on site", "") == "gemini-2.5-flash"
 
 
-def test_pick_model_featured_role_defaults_to_imagen_ultra():
-    """A featured hero image with no special cues gets the higher tier."""
-    assert mr.pick_model("featured", "a modern office building", "") == "imagen4-ultra"
+def test_pick_model_featured_role_defaults_to_nano_banana_pro():
+    """A featured hero image with no special cues gets the higher tier --
+    Nano Banana Pro replaces Imagen 4 Ultra (standing directive)."""
+    assert mr.pick_model("featured", "a modern office building", "") == "nano-banana-pro"
 
 
-def test_pick_model_inline_photoreal_uses_imagen_fast():
-    assert mr.pick_model("inline_1", "a realistic product shot of a fan unit", "") == "imagen4-fast"
+def test_pick_model_inline_photoreal_uses_nano_banana_pro_flash():
+    assert mr.pick_model("inline_1", "a realistic product shot of a fan unit", "") == "nano-banana-pro-flash"
 
 
-def test_pick_model_inline_with_no_cues_uses_third_party_imagen_fast():
-    assert mr.pick_model("inline_2", "something generic", "") == "imagen4-fast"
+def test_pick_model_inline_with_no_cues_uses_nano_banana_pro_flash():
+    assert mr.pick_model("inline_2", "something generic", "") == "nano-banana-pro-flash"
+
+
+def test_pick_model_never_returns_a_disabled_model():
+    """Exhaustive-ish sweep: no combination of role/prompt/style should
+    ever resolve back to a banned Imagen 4 id."""
+    samples = [
+        ("featured", "a photo of ducts", ""), ("featured", "a portrait", ""),
+        ("inline_1", "an icon", ""), ("inline_2", "a realistic product shot", ""),
+        ("featured", "", ""), ("inline_3", "", ""),
+    ]
+    for role, prompt, style in samples:
+        assert mr.pick_model(role, prompt, style) not in mr.DISABLED_MODEL_IDS
 
 
 def test_pick_model_always_returns_a_registered_model():
