@@ -189,6 +189,27 @@ def prompt_for_role(
     return f"{base}. {framing}{style}{lang_clause}".strip()
 
 
+def is_absolute_public_url(url: str) -> bool:
+    """True only for a well-formed absolute http(s) URL with a real host.
+
+    BUG THIS GUARDS AGAINST (found 2026-08-13, live g4s.md draft): storage
+    upload can return a value that is non-empty but NOT a usable link (e.g.
+    a bare relative storage path like ``media-studio/<id>/featured/original.png``
+    instead of ``https://.../media-studio/...``). Callers that only checked
+    ``uploaded.url or fallback_url`` treated ANY non-empty string as success,
+    so a relative path silently replaced a perfectly good provider URL and
+    was later rejected by WordPress Bridge with \"source_url must be a
+    well-formed URL\" -- the picture never attached, with no visible error
+    at generation time. This check requires an actual scheme + host, so a
+    relative/malformed value is correctly treated as \"no URL\" and callers
+    fall back to `fallback_url` instead of persisting garbage.
+    """
+    if not url:
+        return False
+    parsed = re.match(r"^(https?)://([^/\s]+)", url.strip())
+    return bool(parsed)
+
+
 def is_image_url_expired(url: str, *, now: float | None = None) -> bool:
     """True if a Magnific/Freepik CDN image URL's signed token has already
     expired (or will expire within the next 60s -- a small safety margin).

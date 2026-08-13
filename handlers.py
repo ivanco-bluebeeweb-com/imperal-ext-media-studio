@@ -65,6 +65,7 @@ from shared import (
     default_alt_text,
     error as _error,
     filename_for_asset,
+    is_absolute_public_url,
     is_image_url_expired,
     is_valid_model,
     is_valid_model_choice,
@@ -170,7 +171,19 @@ async def _store_image_bytes(
         image_format, "application/octet-stream",
     )
     uploaded = await ctx.storage.upload(path, raw, content_type=content_type)
-    return uploaded.url or fallback_url, path
+    # BUG FIX (2026-08-13): storage.upload() can return a non-empty but
+    # unusable value (e.g. a relative path, not an absolute https:// URL --
+    # confirmed live on a g4s.md draft where WordPress Bridge rejected the
+    # picture with "source_url must be a well-formed URL"). Only accept a
+    # real absolute URL; anything else falls back to the provider's own URL.
+    stored_url = uploaded.url if is_absolute_public_url(uploaded.url) else ""
+    if uploaded.url and not stored_url:
+        await ctx.log(
+            f"Storage upload for {path} returned a non-URL value "
+            f"({uploaded.url!r}); using the provider URL instead.",
+            level="warning",
+        )
+    return stored_url or fallback_url, path
 
 
 async def _maybe_upscale_asset_image(ctx, api_key: str, image_url: str, *, package_id: str = "", role: str = "") -> dict:

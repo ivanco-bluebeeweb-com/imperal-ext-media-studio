@@ -148,6 +148,32 @@ async def test_create_sync_image_uploads_decoded_bytes_and_returns_url(ctx, monk
 
 
 @pytest.mark.asyncio
+async def test_create_sync_image_relative_storage_path_raises(ctx, monkeypatch):
+    """Regression test for the 2026-08-13 g4s.md bug: storage.upload()
+    returning a non-empty but non-absolute value (a bare relative path,
+    not an https:// URL) must be rejected here, not silently persisted --
+    otherwise WordPress Bridge later rejects it downstream with
+    'source_url must be a well-formed URL' and the picture never attaches.
+    """
+    import base64
+    raw = b"\x89PNG\r\n\x1a\nfake-bytes"
+    b64 = base64.b64encode(raw).decode()
+    ctx.http.mock_post("/v1/ai/text-to-image", {"data": [{"base64": b64, "has_nsfw": False}]})
+
+    from imperal_sdk.types.models import FileInfo
+
+    async def fake_upload(path, data, content_type="application/octet-stream"):
+        return FileInfo(path=path, size=len(data), content_type=content_type,
+                         url="media-studio/pkg-1/featured/original.png")
+
+    monkeypatch.setattr(ctx.storage, "upload", fake_upload)
+
+    with pytest.raises(mc.ProviderError) as exc:
+        await mc.create_sync_image(ctx, "key", _classic_fast_spec(), "a cat")
+    assert exc.value.code == "MEDIA_PROVIDER_ERROR"
+
+
+@pytest.mark.asyncio
 async def test_create_sync_image_401_raises_provider_error(ctx):
     ctx.http.mock_post("/v1/ai/text-to-image", {"error": "unauthorized"}, status=401)
     with pytest.raises(mc.ProviderError) as exc:

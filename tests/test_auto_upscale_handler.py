@@ -65,6 +65,49 @@ async def test_generated_image_is_copied_to_permanent_storage(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_relative_storage_path_falls_back_to_provider_url(monkeypatch):
+    """Regression test for the 2026-08-13 g4s.md bug: storage.upload()
+    returning a non-empty but NOT-a-URL value (a bare relative path) must
+    never be persisted as the asset's image_url. WordPress Bridge rejects
+    anything that isn't an absolute https:// URL with 'source_url must be
+    a well-formed URL', so a relative path silently broke every attach.
+    The fix must detect this and fall back to the original CDN URL
+    instead of the bogus stored value.
+    """
+    ctx = _Ctx()
+
+    class _Stored:
+        # This is what actually broke in production: not empty, but also
+        # not an absolute URL -- a relative storage path.
+        url = "media-studio/pkg-1/featured/original.png"
+
+    class _Storage:
+        async def upload(self, path, data, content_type="application/octet-stream"):
+            return _Stored()
+
+    ctx.storage = _Storage()
+
+    async def fake_download(url):
+        return _png(2048, 1536)
+
+    monkeypatch.setattr(h.mc, "download_image_bytes", fake_download)
+
+    result = await h._maybe_upscale_asset_image(
+        ctx,
+        "key",
+        "https://cdn.example/original.png?temporary-token",
+        package_id="pkg-1",
+        role="featured",
+    )
+
+    # Must fall back to the real provider URL, NOT the bogus relative path.
+    assert result["image_url"] == "https://cdn.example/original.png?temporary-token"
+    assert result["original_image_url"] == "https://cdn.example/original.png?temporary-token"
+    # A warning must be logged so the substitution is never silent.
+    assert any("non-URL value" in msg for msg, level in ctx.logs)
+
+
+@pytest.mark.asyncio
 async def test_small_image_is_auto_upscaled(monkeypatch):
     ctx = _Ctx()
     calls = {}

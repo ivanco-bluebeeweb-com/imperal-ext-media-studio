@@ -29,6 +29,8 @@ import base64
 
 import httpx
 
+from shared import is_absolute_public_url
+
 BASE_URL = "https://api.magnific.com"
 CREATE_PATH = "/v1/ai/mystic"
 
@@ -345,9 +347,16 @@ async def create_sync_image(ctx, api_key: str, spec, prompt: str) -> str:
         )
     path = f"media-studio/{spec.id}-{uuid.uuid4().hex[:12]}-{int(time.time())}.png"
     info = await ctx.storage.upload(path, raw, content_type="image/png")
-    if not info.url:
+    # BUG FIX (2026-08-13): storage.upload() can return a non-empty but
+    # unusable value (e.g. a relative path, not an absolute https:// URL).
+    # `not info.url` alone let a relative path through as if it were a real
+    # link -- WordPress Bridge then rejected it downstream with "source_url
+    # must be a well-formed URL" and the picture never attached. Require an
+    # actual absolute URL here, at the source, instead of downstream.
+    if not is_absolute_public_url(info.url):
         raise ProviderError(
-            f"Uploaded the {spec.label} image but storage returned no URL.",
+            f"Uploaded the {spec.label} image but storage returned no "
+            f"usable URL (got {info.url!r}).",
             "MEDIA_PROVIDER_ERROR",
         )
     return info.url
