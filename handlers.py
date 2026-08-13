@@ -566,6 +566,29 @@ async def create_project(ctx, params: CreateProjectParams) -> ActionResult:
     return ActionResult.success(entity, f"Project '{data['name']}' created.")
 
 
+@ext.expose("register_project", action_type="write")
+async def expose_register_project(ctx, site_id: str = "", domain: str = "",
+                                   name: str = "", **kwargs) -> dict:
+    """Inter-extension IPC surface (ctx.extensions.call) for Sites Registry:
+    called automatically whenever a site is registered there (manually,
+    via WordPress Hub's connect, or via a registry sync/backfill), so it
+    shows up here as an existing project without the user re-adding it
+    by hand.
+
+    Thin wrapper over the same idempotent storage.create_project used by
+    the create_project chat tool -- a site_id that already has a project
+    is left completely untouched. Returns a plain dict (never surfaced to
+    the LLM/user directly).
+    """
+    sid = (site_id or domain).strip()
+    if not sid:
+        return {"ok": False, "error": "site_id or domain is required.", "retryable": False}
+    created = await st.create_project(ctx, sid, name.strip())
+    if created is None:
+        return {"ok": True, "site_id": sid, "created": False}
+    return {"ok": True, "site_id": sid, "created": True}
+
+
 @chat.function(
     "list_media_packages",
     "List media packages, optionally filtered by site or status.",
