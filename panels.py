@@ -183,58 +183,40 @@ async def packages_nav_panel(ctx, site: str = "", show_add_project: str = "", **
 # both old screens and adds the missing discovery section.
 
 def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dict]) -> ui.UINode:
+    """App settings screen. UI_INTERFACE_STANDARD.md rule 1-3 (one button,
+    one screen, everything configurable) PLUS the tabs-first navigation
+    rule: ui.Tabs is the primary navigator across sub-sections, not a flat
+    stack of ui.Section blocks one under another. Each former Section
+    becomes one tab; tab content is the same children, just wrapped.
+
+    WHY THE FIRST TAB IS "Providers" (plural), NOT "Image provider". This
+    screen manages exactly one provider today (Magnific), but the model
+    registry already supports routing to several providers' models
+    (Gemini/Nano Banana already reachable through Magnific; a future direct
+    Gemini/other key is the next seam -- see providers.py's own note on
+    _KNOWN_PROVIDERS). Building the tab as a per-provider LIST from the
+    start means adding a second provider later is one more row in this
+    list, not a second tab or a rewrite of this function.
+    """
     magnific = next((c for c in connections if c.provider == "magnific"), None)
     connected = bool(magnific and magnific.connected)
 
-    children: list[ui.UINode] = [
-        ui.Header(text="App settings", level=2,
-                   subtitle="Everything you can configure in Media Hub"),
-    ]
+    # -- Providers tab -- one row per known provider ---------------------
+    providers_tab = ui.Stack(direction="v", gap=3, children=[
+        ui.Header(text="Image provider", level=3),
+        *(_provider_form_children(connected)),
+    ])
 
-    # -- Image provider --------------------------------------------------
-    provider_children: list[ui.UINode] = []
-    if connected:
-        provider_children.append(ui.Alert(
-            title="Magnific connected", message="Images are ready to generate.",
-            type="success",
-        ))
-    else:
-        provider_children.append(ui.Alert(
-            title="Not connected",
-            message="Paste an API key below to start generating images.",
-            type="info",
-        ))
-        provider_children.append(ui.Link(
-            label="Get a key on magnific.com", href=_MAGNIFIC_SIGNUP_URL,
-        ))
+    # -- Webhook secret tab (declared, not used yet -- say so honestly) --
+    webhook_tab = ui.Stack(direction="v", gap=2, children=[
+        ui.Text(
+            content="Not needed yet -- Media Hub checks image status "
+                    "itself, without webhooks.",
+            variant="caption",
+        ),
+    ])
 
-    provider_children.append(ui.Form(
-        action="connect_magnific",
-        submit_label="Verify and connect",
-        children=[
-            ui.Password(param_name="api_key", placeholder="Magnific API key"),
-        ],
-    ))
-    if connected:
-        provider_children.append(ui.Button(
-            "Disconnect", icon="Unlink", variant="danger", size="sm",
-            on_click=ui.Call("disconnect_magnific"),
-        ))
-    children.append(ui.Section(title="Image provider", children=provider_children))
-
-    # -- Webhook secret (declared, not used yet -- say so honestly) -----
-    children.append(ui.Section(
-        title="Webhook secret",
-        children=[
-            ui.Text(
-                content="Not needed yet -- Media Hub checks image status "
-                        "itself, without webhooks.",
-                variant="caption",
-            ),
-        ],
-    ))
-
-    # -- New model checks (was chat-only; now visible here too) ----------
+    # -- New model checks tab (was chat-only; now visible here too) ------
     discovery_children: list[ui.UINode] = [
         ui.Text(
             content="Media Hub checks once a day for new image models. "
@@ -265,9 +247,9 @@ def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dic
         discovery_children.append(ui.Empty(
             message="No checks yet -- click Check now above.",
         ))
-    children.append(ui.Section(title="New model checks", children=discovery_children))
+    discovery_tab = ui.Stack(direction="v", gap=2, children=discovery_children)
 
-    # -- Image Prompt engine (monthly self-review, visible here too) -----
+    # -- Image Prompt engine tab (monthly self-review, visible here too) -
     prompt_children: list[ui.UINode] = [
         ui.Text(
             content="Media Hub checks once a month whether its own image "
@@ -300,9 +282,10 @@ def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dic
         prompt_children.append(ui.Empty(
             message="No reviews yet -- click Check now above.",
         ))
-    children.append(ui.Section(title="Image Prompt engine", children=prompt_children))
+    prompt_tab = ui.Stack(direction="v", gap=2, children=prompt_children)
 
-    children.append(ui.Section(title="Image storage", children=[
+    # -- Image storage tab ------------------------------------------------
+    storage_tab = ui.Stack(direction="v", gap=2, children=[
         ui.Text(
             "Generated images are copied into Media Hub storage and stay available until you delete them. "
             "Use this once to restore older images that were saved with an expired provider link.",
@@ -312,14 +295,58 @@ def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dic
             "Restore older images", variant="secondary",
             on_click=ui.Call("recover_stored_images"),
         ),
-    ]))
+    ])
 
-    children.append(ui.Button(
-        "Close", variant="ghost",
-        on_click=ui.Call("__panel__studio", view="", package_id=""),
+    tabs = ui.Tabs(tabs=[
+        {"label": "Providers", "content": providers_tab},
+        {"label": "New model checks", "content": discovery_tab},
+        {"label": "Image Prompt engine", "content": prompt_tab},
+        {"label": "Image storage", "content": storage_tab},
+        {"label": "Webhook secret", "content": webhook_tab},
+    ])
+
+    return ui.Stack(children=[
+        ui.Header(text="App settings", level=2,
+                   subtitle="Everything you can configure in Media Hub"),
+        tabs,
+        ui.Button(
+            "Close", variant="ghost",
+            on_click=ui.Call("__panel__studio", view="", package_id=""),
+        ),
+    ], gap=4)
+
+
+def _provider_form_children(connected: bool) -> list[ui.UINode]:
+    """The Magnific connect/disconnect form -- pulled out so the Providers
+    tab reads as one row per provider even while there is only one."""
+    children: list[ui.UINode] = []
+    if connected:
+        children.append(ui.Alert(
+            title="Magnific connected", message="Images are ready to generate.",
+            type="success",
+        ))
+    else:
+        children.append(ui.Alert(
+            title="Not connected",
+            message="Paste an API key below to start generating images.",
+            type="info",
+        ))
+        children.append(ui.Link(
+            label="Get a key on magnific.com", href=_MAGNIFIC_SIGNUP_URL,
+        ))
+    children.append(ui.Form(
+        action="connect_magnific",
+        submit_label="Verify and connect",
+        children=[
+            ui.Password(param_name="api_key", placeholder="Magnific API key"),
+        ],
     ))
-
-    return ui.Stack(children=children, gap=4)
+    if connected:
+        children.append(ui.Button(
+            "Disconnect", icon="Unlink", variant="danger", size="sm",
+            on_click=ui.Call("disconnect_magnific"),
+        ))
+    return children
 
 
 # ── Package editor screen ────────────────────────────────────────────────────
