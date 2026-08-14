@@ -36,6 +36,7 @@ import codes as c
 import image_dims
 import magnific_client as mc
 import model_registry as mr
+import prompt_engine as pe
 import recovery
 import storage as st
 from app import chat, ext
@@ -69,7 +70,6 @@ from shared import (
     is_image_url_expired,
     is_valid_model,
     is_valid_model_choice,
-    prompt_for_role,
     roles_for,
     valid_model_choices_hint,
 )
@@ -390,7 +390,7 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
     roles = roles_for(params.inline_count)
     assets = []
     for role in roles:
-        prompt = prompt_for_role(
+        prompt = pe.generate_prompt(
             role, params.article_title, params.summary, params.style_direction,
             params.lang.strip(), text_policy, image_text,
         )

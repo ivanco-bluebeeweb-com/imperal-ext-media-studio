@@ -287,7 +287,7 @@ async def test_every_back_close_cancel_button_clears_package_id_explicitly(ctx_w
 
     existing = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
     new_brief = panels._editor_new(ctx_with_key, any_connected=True)
-    settings = panels._settings_view(ctx_with_key, [], [])
+    settings = panels._settings_view(ctx_with_key, [], [], [])
 
     all_calls = _back_calls(existing) + _back_calls(new_brief) + _back_calls(settings)
     assert all_calls, "expected at least one back-to-catalog button"

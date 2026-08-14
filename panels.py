@@ -39,6 +39,7 @@ from imperal_sdk import ui
 
 from app import ext
 import model_discovery as md
+import prompt_engine as pe
 import magnific_client as mc
 import storage as st
 import model_registry as mr
@@ -188,7 +189,7 @@ async def packages_nav_panel(ctx, site: str = "", show_add_project: str = "", **
 # could never see whether new models had been found. This screen replaces
 # both old screens and adds the missing discovery section.
 
-def _settings_view(ctx, connections: list, log: list[dict]) -> ui.UINode:
+def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dict]) -> ui.UINode:
     magnific = next((c for c in connections if c.provider == "magnific"), None)
     connected = bool(magnific and magnific.connected)
 
@@ -272,6 +273,41 @@ def _settings_view(ctx, connections: list, log: list[dict]) -> ui.UINode:
             message="No checks yet -- click Check now above.",
         ))
     children.append(ui.Section(title="New model checks", children=discovery_children))
+
+    # -- Image Prompt engine (monthly self-review, visible here too) -----
+    prompt_children: list[ui.UINode] = [
+        ui.Text(
+            content="Media Hub checks once a month whether its own image "
+                    "prompts still follow current best practice, and "
+                    "re-scores a sample of its own recent prompts. It only "
+                    "reports what it finds -- it never rewrites its own "
+                    "rules by itself.",
+            variant="caption",
+        ),
+        ui.Button(
+            "Check now", icon="RefreshCw", variant="secondary",
+            size="sm", on_click=ui.Call("check_prompt_engine_updates"),
+        ),
+    ]
+    if prompt_log:
+        items = [
+            ui.ListItem(
+                id=entry.get("checked_at", ""),
+                title=entry.get("checked_at", ""),
+                subtitle=(
+                    f"avg score {entry.get('avg_score', 0)}/100"
+                    + (" -- review recommended" if entry.get("review_recommended") else "")
+                ),
+                meta=entry.get("note", ""),
+            )
+            for entry in prompt_log
+        ]
+        prompt_children.append(ui.List(items=items))
+    else:
+        prompt_children.append(ui.Empty(
+            message="No reviews yet -- click Check now above.",
+        ))
+    children.append(ui.Section(title="Image Prompt engine", children=prompt_children))
 
     children.append(ui.Section(title="Image storage", children=[
         ui.Text(
@@ -530,7 +566,8 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
 
     if view in ("settings", "connect", "providers"):
         log = await md.list_log(ctx, limit=5)
-        return _settings_view(ctx, connections, log)
+        prompt_log = await pe.list_review_log(ctx, limit=5)
+        return _settings_view(ctx, connections, log, prompt_log)
     if view == "editor" or package_id:
         if not package_id or package_id == "new":
             return _editor_new(ctx, any_connected, site=site)

@@ -90,6 +90,47 @@ declared secret, one more `_xxx_connection()` builder, and one more entry in
   (declared secrets always get one), and still usable directly, but no
   longer the only way in: `magnific_api_key` is `write_mode="both"`.
 
+## Image Prompt engine
+
+`prompt_engine.py` + `handlers_prompt_engine.py` are the built-in engine
+responsible for generating, analyzing, and deterministically fixing image
+prompts, plus a monthly self-review that watches for drift in prompting
+best practice -- WITHOUT ever silently rewriting its own rules.
+
+1. **Generation** — `create_media_brief` now builds every asset's prompt
+   through `prompt_engine.generate_prompt` instead of calling
+   `shared.prompt_for_role` directly. The underlying construction (subject/
+   summary + role framing + style + text policy + language clause) is
+   unchanged; the engine's own step on top auto-appends a generic
+   lighting + camera/lens clause whenever the constructed prompt doesn't
+   already carry one of its own (e.g. no `style_direction` was given). This
+   closes a gap confirmed by a 2026-08-14 cross-vendor prompting-guide study
+   (Google Gemini, Black Forest Labs Flux.2, OpenAI GPT Image, BytePlus
+   Seedream): a prompt missing lighting/camera language is the single most
+   common cause of "flat"-looking AI output, because the model then silently
+   defaults those choices on its own.
+2. **`analyze_prompt`** — scores any prompt text against a 6-slot rubric
+   (subject, environment, composition, lighting, style/medium, technical/
+   camera). This is a plain keyword-presence heuristic, stated honestly: a
+   hit proves a slot was ADDRESSED, never that it's good writing.
+3. **`fix_prompt`** — runs the same rubric and appends the same generic
+   lighting/camera/style clauses `generate_prompt` would have, for a prompt
+   built outside the engine (e.g. a manual `prompt_override` on
+   `regenerate_asset`). It never invents subject or environment content —
+   any such gap is reported as `unfixable_issues`, not guessed.
+4. **`check_prompt_engine_updates`** / monthly `media_prompt_engine_review`
+   schedule tick — once a calendar month (and callable manually any time),
+   hash-diffs three public vendor prompting-guide pages (BFL Flux.2, OpenAI
+   GPT Image, BytePlus Seedream) against their last-known hashes, and
+   re-scores a sample of this app's own recently generated prompts. Always
+   writes a permanent log entry (`list_prompt_engine_log`), whether or not
+   anything changed — same append-only discipline as the model-discovery
+   log. A guide hash changing, or the sampled average score dropping below
+   70/100, sets `review_recommended=true`: a signal for a human to look and,
+   if warranted, manually update the engine's clause library — never a
+   trigger for the engine to rewrite itself. Visible both in chat and in
+   the settings panel's "Image Prompt engine" section.
+
 ## Design notes
 
 **Why polling, not `@ext.webhook`, in v1.** A confirmed platform bug in a

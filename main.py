@@ -15,13 +15,15 @@ if _EXT_DIR not in sys.path:
     sys.path.insert(0, _EXT_DIR)
 
 _LOCAL = ("app", "models", "codes", "shared", "storage", "magnific_client",
-          "model_registry", "model_discovery", "recovery",
-          "handlers", "handlers_discovery", "providers", "panels")
+          "model_registry", "model_discovery", "prompt_engine", "recovery",
+          "handlers", "handlers_discovery", "handlers_prompt_engine",
+          "providers", "panels")
 for _mod in _LOCAL:
     sys.modules.pop(_mod, None)
 
 from app import ext, chat  # noqa: E402,F401
 import handlers  # noqa: E402,F401
 import handlers_discovery  # noqa: E402,F401
+import handlers_prompt_engine  # noqa: E402,F401
 import providers  # noqa: E402,F401
 import panels  # noqa: E402,F401

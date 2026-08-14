@@ -1,0 +1,407 @@
+"""The Image Prompt engine -- generation, analysis, deterministic fixes, and
+a monthly self-review that WATCHES for drift without ever silently rewriting
+its own rules.
+
+WHY THIS EXISTS, SEPARATE FROM `shared.prompt_for_role`.
+
+`shared.prompt_for_role` builds the base prompt (subject/summary + role
+framing + style + text policy + language clause) -- that part stays exactly
+as-is, unchanged, still the single source of truth for brief-time prompt
+construction. What it never covered, confirmed against a cross-vendor study
+of Google's own Gemini image guide, Black Forest Labs' Flux.2 guide, OpenAI's
+GPT Image cookbook and BytePlus' Seedream guide (2026-08-14 research,
+also saved as an Imperal note): most "flat"/generic-looking AI images trace
+back to two missing prompt slots that a model then silently defaults on its
+own -- LIGHTING and CAMERA/LENS language. This module is the seam that:
+
+  1. GENERATES an enriched prompt (`generate_prompt`) -- calls
+     `shared.prompt_for_role` unchanged, then deterministically appends a
+     generic lighting/camera clause ONLY IF the constructed prompt doesn't
+     already mention one (so a caller's own style_direction that already
+     says "golden hour lighting, shot on 85mm" is never double-stamped).
+  2. ANALYZES any prompt (`analyze_prompt`) against a 6-slot rubric (Subject,
+     Environment, Composition, Lighting, Style/Medium, Technical/Camera) --
+     a plain keyword-presence heuristic, not a semantic model. This is
+     deliberate and stated honestly: a keyword hit proves a slot was
+     ADDRESSED, not that it's good. Never claim more than that.
+  3. FIXES a prompt (`fix_prompt`) -- runs the same analysis and appends
+     the SAME generic lighting/camera/style clauses `generate_prompt` would
+     have appended, for a prompt built outside this engine (e.g. a manual
+     `prompt_override` on regenerate_asset). It NEVER invents subject or
+     environment content -- those slots, if missing, are reported as
+     `unfixable_issues` for a human to add real words to, exactly the same
+     "never guess the actual content" discipline `model_discovery.py` uses
+     for a new model's request-body shape.
+  4. Runs a MONTHLY self-review (`run_self_review`) with the exact same
+     shape as `model_discovery.py`'s daily check: hash-diff three vendors'
+     own public prompting-guide pages (proof text actually changed, not a
+     guess) and re-score a sample of this app's OWN already-generated
+     prompts against the rubric. Every run is permanently logged, whether
+     or not anything changed. If a guide's hash changed, or the sampled
+     average score drops below a threshold, that is recorded as a finding
+     for a human to review and, if warranted, manually update
+     `_GENERIC_LIGHTING`/`_GENERIC_CAMERA`/`SLOT_KEYWORDS` below -- the same
+     discipline as model_discovery.py's `EXCLUDED_SLUGS`/ModelSpec review:
+     a docs page changing proves nothing about what changed IN it, so this
+     never rewrites its own clause library automatically.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import re
+import time
+
+import shared
+
+#: Public, unauthenticated vendor prompting-guide pages, confirmed reachable
+#: 2026-08-14 during the research this module is built from. Google's own
+#: Gemini image-prompt guide is deliberately NOT in this list -- it is only
+#: exposed through the Gemini connector's own tool, not a plain HTTPS page
+#: this app could fetch honestly with ctx.http, and inventing a doc URL for
+#: it would violate the "never guess a URL" discipline model_discovery.py
+#: already established for Magnific's own docs.
+GUIDE_SOURCES: tuple[tuple[str, str], ...] = (
+    ("flux2_bfl", "https://docs.bfl.ml/guides/prompting_guide_flux2"),
+    ("gpt_image_openai",
+     "https://developers.openai.com/cookbook/examples/multimodal/"
+     "image-gen-models-prompting-guide"),
+    ("seedream_byteplus", "https://docs.byteplus.com/en/docs/ModelArk/1829186"),
+)
+
+#: Wakes hourly, asks "already ran this calendar month?" -- same shape as
+#: model_discovery.py's TICK_CRON, a different minute so the two schedules
+#: (both registered on this same extension) never fire in the same tick.
+TICK_CRON = "20 * * * *"
+CHECK_HOUR_UTC = 7
+
+REVIEW_STATE_COLLECTION = "prompt_engine_state"
+REVIEW_STATE_KEY = "state"
+REVIEW_LOG_COLLECTION = "prompt_engine_log"
+
+#: Below this average rubric score (0-100) across the sampled prompts, a
+#: self-review run flags "review recommended" -- a signal for a human, never
+#: a trigger for this module to rewrite itself.
+SCORE_ALERT_THRESHOLD = 70
+
+# --------------------------- the 6-slot rubric ---------------------------
+#
+# Keyword-presence heuristic ONLY. A hit means the slot was addressed in
+# SOME form; it does not grade quality, originality, or whether the words
+# make sense together. Every score/finding this module produces must be
+# read with that honest ceiling in mind -- never oversold as "the prompt is
+# good", only "the prompt mentions X".
+
+SLOT_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "subject": (),  # handled specially: non-empty prompt text itself
+    "environment": (
+        "in a", "at a", "on a", "inside", "outside", "background", "setting",
+        "scene", "room", "street", "kitchen", "office", "studio backdrop",
+        "landscape", "indoor", "outdoor", "against a",
+    ),
+    "composition": (
+        "shot", "close-up", "close up", "wide", "hero", "detail", "angle",
+        "framing", "aspect ratio", "top-down", "low-angle", "eye-level",
+        "macro", "portrait", "landscape orientation", "centered",
+    ),
+    "lighting": (
+        "lighting", "lit", "backlit", "golden hour", "sunlight", "daylight",
+        "studio light", "ambient light", "soft light", "glow", "shadow",
+        "exposure", "natural light", "warm light", "cool light",
+    ),
+    "style": (
+        "photorealistic", "illustration", "cinematic", "watercolor",
+        "3d render", "editorial", "studio photography", "vintage",
+        "professional photo", "hyperrealistic", "digital art", "realism",
+        "documentary style", "product photography",
+    ),
+    "technical": (
+        "lens", "mm lens", "camera", "35mm", "50mm", "85mm", "telephoto",
+        "wide-angle lens", "depth of field", "bokeh", "drone", "aerial",
+        "film grain", "iso ", "aperture",
+    ),
+}
+
+#: The two structural slots this engine will ever auto-append to -- always
+#: generic, role-shaped boilerplate, never a guess at the subject itself.
+#: Kept short and deliberately unopinionated; a real style_direction always
+#: overrides these by already mentioning lighting/camera language (checked
+#: via SLOT_KEYWORDS before appending, so this never double-stamps).
+_GENERIC_LIGHTING = (
+    "Lit with soft, natural directional lighting for realistic depth and shadow."
+)
+_GENERIC_CAMERA = {
+    "featured": (
+        "Captured as if shot on a 35mm lens at eye level with a shallow "
+        "depth of field, professional editorial look."
+    ),
+    "inline": (
+        "Captured as if shot on a 50mm lens with a tighter, detail-focused framing."
+    ),
+}
+_GENERIC_STYLE = "professional editorial photography style"
+
+
+def _role_bucket(role: str) -> str:
+    return "featured" if role == "featured" else "inline"
+
+
+def _has_any(prompt_lower: str, keywords: tuple[str, ...]) -> bool:
+    return any(kw in prompt_lower for kw in keywords)
+
+
+def analyze_prompt(prompt: str) -> dict:
+    """Score `prompt` against the 6-slot rubric.
+
+    Returns a dict with `score` (0-100, one of 6 slots per point since
+    "subject" is trivially satisfied by any non-empty prompt), `covered`
+    and `missing` slot-name lists, so a caller can tell exactly which of
+    the 6 the heuristic did NOT find a keyword for.
+    """
+    text = (prompt or "").strip()
+    if not text:
+        return {"score": 0, "covered": [], "missing": list(SLOT_KEYWORDS.keys())}
+    lower = text.lower()
+    covered: list[str] = []
+    missing: list[str] = []
+    for slot, keywords in SLOT_KEYWORDS.items():
+        if slot == "subject":
+            covered.append(slot)  # non-empty prompt text IS the subject slot
+            continue
+        if _has_any(lower, keywords):
+            covered.append(slot)
+        else:
+            missing.append(slot)
+    score = round(100 * len(covered) / len(SLOT_KEYWORDS))
+    return {"score": score, "covered": covered, "missing": missing}
+
+
+def fix_prompt(prompt: str, role: str = "featured") -> tuple[str, list[str], list[str]]:
+    """Deterministically fix ONLY the structural slots this engine is
+    allowed to fill without guessing real content (lighting, camera,
+    generic style-fallback). Returns (fixed_prompt, additions, unfixable).
+
+    `additions` lists what was appended, in plain English, so a caller can
+    show exactly what changed -- never a silent rewrite. `unfixable`
+    carries any of {"subject", "environment"} still missing after the fix:
+    those need real words from the caller (article_title/summary/context),
+    which this engine will never invent.
+    """
+    text = (prompt or "").strip()
+    analysis = analyze_prompt(text)
+    missing = set(analysis["missing"])
+    additions: list[str] = []
+    fixed = text
+
+    if "lighting" in missing:
+        fixed = f"{fixed} {_GENERIC_LIGHTING}".strip()
+        additions.append(f"Added lighting clause: \"{_GENERIC_LIGHTING}\"")
+        missing.discard("lighting")
+
+    if "technical" in missing:
+        camera_clause = _GENERIC_CAMERA[_role_bucket(role)]
+        fixed = f"{fixed} {camera_clause}".strip()
+        additions.append(f"Added camera/lens clause: \"{camera_clause}\"")
+        missing.discard("technical")
+
+    if "style" in missing:
+        fixed = f"{fixed} Style: {_GENERIC_STYLE}.".strip()
+        additions.append(f"Added generic style fallback: \"{_GENERIC_STYLE}\"")
+        missing.discard("style")
+
+    unfixable = sorted(missing & {"subject", "environment", "composition"})
+    return fixed, additions, unfixable
+
+
+def generate_prompt(
+    role: str, article_title: str, summary: str, style_direction: str,
+    lang: str = "", text_policy: str = shared.TEXT_POLICY_NO_TEXT,
+    image_text: str = "",
+) -> str:
+    """The engine's own entry point for BRIEF-TIME prompt generation --
+    same inputs/output shape as `shared.prompt_for_role`, but auto-enriched
+    with a lighting/camera clause when the base construction doesn't
+    already carry one (e.g. no style_direction was given, or it didn't
+    mention either). This is the function `create_media_brief` calls; the
+    underlying `shared.prompt_for_role` keeps working exactly as before for
+    any other caller/test that still calls it directly.
+    """
+    base = shared.prompt_for_role(
+        role, article_title, summary, style_direction, lang, text_policy, image_text,
+    )
+    fixed, _additions, _unfixable = fix_prompt(base, role)
+    return fixed
+
+
+# --------------------------- monthly self-review ---------------------------
+
+def _now_month(ts: float | None = None) -> str:
+    return time.strftime("%Y-%m", time.gmtime(ts if ts is not None else time.time()))
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
+
+
+async def _fetch_guide_hash(ctx, url: str) -> tuple[bool, str]:
+    """(reachable, sha256_of_body). Never raises -- an unreachable source is
+    a normal, expected outcome (a vendor page moves/blocks bots), reported
+    per-source rather than failing the whole review run."""
+    try:
+        resp = await ctx.http.get(url, timeout=30)
+        if not (200 <= resp.status_code < 300):
+            return False, ""
+        body = resp.text()
+        return True, _sha256(body)
+    except Exception:
+        return False, ""
+
+
+async def _read_state(ctx) -> dict:
+    try:
+        doc = await ctx.store.get(REVIEW_STATE_COLLECTION, REVIEW_STATE_KEY)
+    except Exception:
+        doc = None
+    data = {"last_month": "", "guide_hashes": {}}
+    if doc is not None:
+        raw = getattr(doc, "data", None) or {}
+        if isinstance(raw, dict):
+            data.update({k: v for k, v in raw.items() if k in data})
+    return data
+
+
+async def _write_state(ctx, data: dict) -> None:
+    try:
+        await ctx.store.update(REVIEW_STATE_COLLECTION, REVIEW_STATE_KEY, data)
+    except Exception:
+        try:
+            await ctx.store.create(REVIEW_STATE_COLLECTION,
+                                    {"id": REVIEW_STATE_KEY, **data})
+        except Exception:
+            pass
+
+
+async def due(ctx, *, ts: float | None = None) -> bool:
+    """True once per calendar month, after CHECK_HOUR_UTC -- same date-guard
+    discipline as model_discovery.due(), just compared by month instead of
+    by day, and self-catching-up: if the app was paused/offline through the
+    1st, the next hourly tick after CHECK_HOUR_UTC on ANY later day this
+    month still fires it exactly once (last_month simply won't match yet)."""
+    state = await _read_state(ctx)
+    now = time.gmtime(ts if ts is not None else time.time())
+    if now.tm_hour < CHECK_HOUR_UTC:
+        return False
+    return str(state.get("last_month") or "") != _now_month(ts)
+
+
+async def _sample_recent_prompts(ctx, limit: int = 20) -> list[str]:
+    """Grade the engine's own recent real output, not synthetic examples --
+    pulls prompts straight off already-generated media package assets."""
+    import storage as st
+    packages = await st.list_packages(ctx, limit=50)
+    prompts: list[str] = []
+    for pkg in packages:
+        for asset in pkg.get("assets", []):
+            p = (asset.get("prompt") or "").strip()
+            if p:
+                prompts.append(p)
+            if len(prompts) >= limit:
+                return prompts
+    return prompts
+
+
+async def run_self_review(ctx, *, ts: float | None = None) -> dict:
+    """The actual monthly job: hash-diff the 3 vendor guide pages against
+    last month's stored hashes, and re-score a sample of this app's own
+    recent prompts. Always returns a full result and always gets logged by
+    the caller -- this function itself never writes the permanent log, so
+    the manual `check_prompt_engine_updates` tool and the scheduled tick
+    share EXACTLY one code path with no drift between them."""
+    state = await _read_state(ctx)
+    old_hashes: dict = dict(state.get("guide_hashes") or {})
+    new_hashes: dict[str, str] = {}
+    guides_changed: list[str] = []
+    guides_unreachable: list[str] = []
+
+    for name, url in GUIDE_SOURCES:
+        reachable, digest = await _fetch_guide_hash(ctx, url)
+        if not reachable:
+            guides_unreachable.append(name)
+            if name in old_hashes:
+                new_hashes[name] = old_hashes[name]  # keep last-known, don't wipe on a blip
+            continue
+        new_hashes[name] = digest
+        if name in old_hashes and old_hashes[name] != digest:
+            guides_changed.append(name)
+
+    sample = await _sample_recent_prompts(ctx)
+    scores = [analyze_prompt(p)["score"] for p in sample]
+    avg_score = round(sum(scores) / len(scores)) if scores else None
+
+    review_recommended = bool(guides_changed) or (
+        avg_score is not None and avg_score < SCORE_ALERT_THRESHOLD
+    )
+
+    notes = []
+    if guides_changed:
+        notes.append(
+            f"{len(guides_changed)} guide(s) changed since last check: "
+            f"{', '.join(guides_changed)} -- read the page and decide by hand "
+            "whether SLOT_KEYWORDS/_GENERIC_LIGHTING/_GENERIC_CAMERA in "
+            "prompt_engine.py need updating. Never auto-applied."
+        )
+    if guides_unreachable:
+        notes.append(f"Could not reach: {', '.join(guides_unreachable)} (skipped, kept last-known hash).")
+    if avg_score is not None:
+        notes.append(
+            f"Sampled {len(sample)} recent generated prompt(s), average rubric "
+            f"score {avg_score}/100."
+            + (" Below alert threshold -- review recommended." if avg_score < SCORE_ALERT_THRESHOLD else "")
+        )
+    else:
+        notes.append("No generated prompts found yet to sample.")
+
+    await _write_state(ctx, {
+        "last_month": _now_month(ts),
+        "guide_hashes": new_hashes,
+    })
+
+    return {
+        "checked_at": ts if ts is not None else time.time(),
+        "guides_checked": len(GUIDE_SOURCES),
+        "guides_changed": guides_changed,
+        "guides_unreachable": guides_unreachable,
+        "sample_size": len(sample),
+        "avg_score": avg_score,
+        "review_recommended": review_recommended,
+        "note": " ".join(notes),
+    }
+
+
+async def record_review(ctx, result: dict) -> dict:
+    """Permanently log this review -- one row per run, never overwritten,
+    same append-only discipline as model_discovery.record_check."""
+    entry = {
+        "checked_at": result["checked_at"],
+        "guides_changed": list(result["guides_changed"]),
+        "guides_unreachable": list(result["guides_unreachable"]),
+        "sample_size": result["sample_size"],
+        "avg_score": result["avg_score"],
+        "review_recommended": result["review_recommended"],
+        "note": result["note"],
+    }
+    try:
+        await ctx.store.create(REVIEW_LOG_COLLECTION, entry)
+    except Exception:
+        pass
+    return entry
+
+
+async def list_review_log(ctx, limit: int = 30) -> list[dict]:
+    try:
+        page = await ctx.store.query(REVIEW_LOG_COLLECTION, limit=200)
+    except Exception:
+        return []
+    rows = [dict(d.data) for d in page.data]
+    rows.sort(key=lambda r: r.get("checked_at", 0), reverse=True)
+    return rows[:limit]

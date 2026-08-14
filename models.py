@@ -267,3 +267,77 @@ class ModelDiscoveryLogEntry(sdl.Entity):
     source_reachable: bool = False
     new_candidate_slugs: list[str] = Field(default_factory=list)
     note: str = ""
+
+
+# --------------------------- Image Prompt engine ---------------------------
+
+class AnalyzePromptParams(BaseModel):
+    prompt: str = Field(
+        "", description="The image prompt text to analyze against the "
+                        "6-slot rubric (subject/environment/composition/"
+                        "lighting/style/technical).")
+
+
+class PromptAnalysis(sdl.Entity):
+    """Result of scoring one prompt -- a keyword-presence heuristic, not a
+    quality judgement. `score` is 0-100; `missing` names exactly which of
+    the 6 slots the heuristic found no keyword for."""
+    prompt: str = ""
+    score: int = 0
+    covered_slots: list[str] = Field(default_factory=list)
+    missing_slots: list[str] = Field(default_factory=list)
+
+
+class FixPromptParams(BaseModel):
+    prompt: str = Field("", description="The image prompt text to fix.")
+    role: str = Field(
+        "featured", description="Asset role this prompt is for -- "
+                        "'featured' or an inline role -- decides which "
+                        "generic camera clause fits (wide hero vs detail shot).")
+
+
+class FixedPrompt(sdl.Entity):
+    """Outcome of a deterministic fix pass -- only structural slots this
+    engine is allowed to fill without guessing real content."""
+    original_prompt: str = ""
+    fixed_prompt: str = ""
+    additions: list[str] = Field(default_factory=list)
+    unfixable_issues: list[str] = Field(
+        default_factory=list,
+        description="Slots still missing that need real words from a human "
+                    "(e.g. 'subject', 'environment') -- never invented.")
+
+
+class CheckPromptEngineUpdatesParams(BaseModel):
+    """No inputs -- always checks the same 3 vendor guide sources against
+    their last-known hashes, and re-scores a sample of this app's own
+    recently generated prompts."""
+    pass
+
+
+class ListPromptEngineLogParams(BaseModel):
+    limit: int = Field(30, ge=1, le=100)
+
+
+class PromptEngineReviewResult(sdl.Entity):
+    """Outcome of one monthly (or manually-triggered) self-review run."""
+    checked_at: str = ""
+    guides_checked: int = 0
+    guides_changed: list[str] = Field(default_factory=list)
+    guides_unreachable: list[str] = Field(default_factory=list)
+    sample_size: int = 0
+    avg_score: int = 0
+    review_recommended: bool = False
+    note: str = ""
+
+
+class PromptEngineLogEntry(sdl.Entity):
+    """One past self-review run, newest first -- always recorded, even a
+    run that found nothing changed."""
+    checked_at: str = ""
+    guides_changed: list[str] = Field(default_factory=list)
+    guides_unreachable: list[str] = Field(default_factory=list)
+    sample_size: int = 0
+    avg_score: int = 0
+    review_recommended: bool = False
+    note: str = ""

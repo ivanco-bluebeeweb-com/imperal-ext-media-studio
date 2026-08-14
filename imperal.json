@@ -3293,6 +3293,559 @@
       "owner_chat_tool": "media-studio"
     },
     {
+      "name": "analyze_prompt",
+      "description": "Score an image prompt against a 6-slot rubric (subject, environment, composition, lighting, style, technical/camera) -- a keyword-presence check, not a quality judgement. Shows exactly which slots the prompt does not mention yet.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "prompt": {
+            "default": "",
+            "description": "The image prompt text to analyze against the 6-slot rubric (subject/environment/composition/lighting/style/technical).",
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "title": "AnalyzePromptParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Result of scoring one prompt -- a keyword-presence heuristic, not a\nquality judgement. `score` is 0-100; `missing` names exactly which of\nthe 6 slots the heuristic found no keyword for.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "covered_slots": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Covered Slots",
+            "type": "array"
+          },
+          "missing_slots": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PromptAnalysis",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.analyze_prompt",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "fix_prompt",
+      "description": "Deterministically fix a prompt's missing structural slots (lighting, camera/lens, generic style fallback) without inventing subject or scene content. Any subject/environment gap that's still missing after the fix is reported, not guessed -- add real words yourself for those.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "prompt": {
+            "default": "",
+            "description": "The image prompt text to fix.",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "role": {
+            "default": "featured",
+            "description": "Asset role this prompt is for -- 'featured' or an inline role -- decides which generic camera clause fits (wide hero vs detail shot).",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "title": "FixPromptParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a deterministic fix pass -- only structural slots this\nengine is allowed to fill without guessing real content.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "original_prompt": {
+            "default": "",
+            "title": "Original Prompt",
+            "type": "string"
+          },
+          "fixed_prompt": {
+            "default": "",
+            "title": "Fixed Prompt",
+            "type": "string"
+          },
+          "additions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Additions",
+            "type": "array"
+          },
+          "unfixable_issues": {
+            "description": "Slots still missing that need real words from a human (e.g. 'subject', 'environment') -- never invented.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Unfixable Issues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "FixedPrompt",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.fix_prompt",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "check_prompt_engine_updates",
+      "description": "Manually run the Image Prompt engine's self-review right now (same check that also runs automatically once a month): hash-diffs the vendor prompting guides this engine is built from, and re-scores a sample of this app's own recently generated prompts. Always records the result, whether or not anything changed -- never silently rewrites the engine's own rules.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No inputs -- always checks the same 3 vendor guide sources against\ntheir last-known hashes, and re-scores a sample of this app's own\nrecently generated prompts.",
+        "properties": {},
+        "title": "CheckPromptEngineUpdatesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of one monthly (or manually-triggered) self-review run.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "checked_at": {
+            "default": "",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "guides_checked": {
+            "default": 0,
+            "title": "Guides Checked",
+            "type": "integer"
+          },
+          "guides_changed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guides Changed",
+            "type": "array"
+          },
+          "guides_unreachable": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guides Unreachable",
+            "type": "array"
+          },
+          "sample_size": {
+            "default": 0,
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "avg_score": {
+            "default": 0,
+            "title": "Avg Score",
+            "type": "integer"
+          },
+          "review_recommended": {
+            "default": false,
+            "title": "Review Recommended",
+            "type": "boolean"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PromptEngineReviewResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.check_prompt_engine_updates",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "list_prompt_engine_log",
+      "description": "Show the history of monthly Image Prompt engine self-reviews -- every past run, whether or not it found anything, newest first.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "limit": {
+            "default": 30,
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListPromptEngineLogParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One past self-review run, newest first -- always recorded, even a\nrun that found nothing changed.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "checked_at": {
+            "default": "",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "guides_changed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guides Changed",
+            "type": "array"
+          },
+          "guides_unreachable": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guides Unreachable",
+            "type": "array"
+          },
+          "sample_size": {
+            "default": 0,
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "avg_score": {
+            "default": 0,
+            "title": "Avg Score",
+            "type": "integer"
+          },
+          "review_recommended": {
+            "default": false,
+            "title": "Review Recommended",
+            "type": "boolean"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PromptEngineLogEntry",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.list_prompt_engine_log",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
       "name": "list_providers",
       "description": "List every image-generation provider Media Hub knows about, and whether each one is connected for this user.",
       "action_type": "read",
@@ -3647,6 +4200,10 @@
     {
       "name": "media_model_discovery",
       "cron": "10 * * * *"
+    },
+    {
+      "name": "media_prompt_engine_review",
+      "cron": "20 * * * *"
     }
   ],
   "required_scopes": [],
