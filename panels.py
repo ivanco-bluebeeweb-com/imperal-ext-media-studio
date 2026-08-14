@@ -113,7 +113,7 @@ async def _projects_section(ctx, site: str, show_add_project: str) -> ui.UINode:
 
     children: list[ui.UINode] = [add_project_button]
     if project_items:
-        children.append(ui.List(items=project_items, searchable=True))
+        children.append(ui.List(items=project_items))
     else:
         children.append(ui.Empty(message="No projects yet — add one to get started.", icon="🗂️"))
 
