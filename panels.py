@@ -134,7 +134,10 @@ async def _projects_section(ctx, site: str, show_add_project: str) -> ui.UINode:
             )
         )
 
-    return ui.Card(title="Projects", content=ui.Stack(direction="v", gap=2, children=children))
+    return ui.Stack(
+        direction="v", gap=2,
+        children=[ui.Header(text="Projects", level=3), *children],
+    )
 
 
 @ext.panel(
@@ -161,21 +164,25 @@ async def packages_nav_panel(ctx, site: str = "", show_add_project: str = "", **
 
     projects_section = await _projects_section(ctx, site, show_add_project)
 
-    status_row = ui.Card(
-        title="Providers",
-        subtitle=(
-            "Magnific connected" if any_connected
-            else "No provider connected yet"
-        ),
-        content=ui.Stack(children=[
+    status_row = ui.Stack(
+        direction="v", gap=2,
+        children=[
+            ui.Header(text="Providers", level=3),
+            ui.Text(
+                content=(
+                    "Magnific connected" if any_connected
+                    else "No provider connected yet"
+                ),
+                variant="caption",
+            ),
             ui.Button(
                 "App settings", icon="Settings", variant="secondary", size="sm",
                 on_click=ui.Call("__panel__studio", view="settings"),
             ),
-        ], direction="h"),
+        ],
     )
 
-    return ui.Stack(children=[projects_section, status_row], gap=3)
+    return ui.Stack(children=[projects_section, ui.Divider(), status_row], gap=3)
 
 
 # ── App settings screen -- EVERYTHING configurable, one place ──────────────
