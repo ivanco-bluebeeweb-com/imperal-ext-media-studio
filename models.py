@@ -315,6 +315,39 @@ class CheckPromptEngineUpdatesParams(BaseModel):
     pass
 
 
+class SavePromptEngineConfigParams(BaseModel):
+    """Every field is optional and free text/number -- a blank text field
+    means 'keep the current value' (see prompt_engine.save_prompt_config),
+    so the App settings form can submit all fields every time without
+    accidentally blanking out ones the user didn't touch."""
+    generic_lighting: str = Field(
+        "", description="Lighting clause auto-appended when a prompt is "
+                        "missing lighting language.")
+    generic_camera_featured: str = Field(
+        "", description="Camera/lens clause auto-appended to FEATURED role "
+                        "prompts missing one.")
+    generic_camera_inline: str = Field(
+        "", description="Camera/lens clause auto-appended to INLINE role "
+                        "prompts missing one.")
+    generic_style: str = Field(
+        "", description="Generic style fallback appended when a prompt "
+                        "names no style/medium at all.")
+    score_alert_threshold: str = Field(
+        "", description="Below this average rubric score (0-100), the "
+                        "monthly self-review flags 'review recommended'. "
+                        "Leave blank to keep the current value.")
+
+
+class PromptEngineConfig(sdl.Entity):
+    """The Image Prompt engine's current editable settings -- read by the
+    App settings > Image Prompt engine tab to pre-fill its form."""
+    generic_lighting: str = ""
+    generic_camera_featured: str = ""
+    generic_camera_inline: str = ""
+    generic_style: str = ""
+    score_alert_threshold: int = 0
+
+
 class ListPromptEngineLogParams(BaseModel):
     limit: int = Field(30, ge=1, le=100)
 

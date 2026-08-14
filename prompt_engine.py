@@ -142,6 +142,75 @@ _GENERIC_CAMERA = {
 _GENERIC_STYLE = "professional editorial photography style"
 
 
+#: Persisted, user-editable overrides for the four generic clauses above
+#: plus the review alert threshold -- one doc, defaults to the module
+#: constants so an unconfigured install behaves exactly as before.
+PROMPT_CONFIG_COLLECTION = "prompt_engine_config"
+PROMPT_CONFIG_KEY = "config"
+
+DEFAULT_PROMPT_CONFIG: dict = {
+    "generic_lighting": _GENERIC_LIGHTING,
+    "generic_camera_featured": _GENERIC_CAMERA["featured"],
+    "generic_camera_inline": _GENERIC_CAMERA["inline"],
+    "generic_style": _GENERIC_STYLE,
+    "score_alert_threshold": SCORE_ALERT_THRESHOLD,
+}
+
+
+async def get_prompt_config(ctx) -> dict:
+    """The effective config: built-in defaults, overridden by whatever the
+    user has saved via the App settings > Image Prompt engine tab. Missing
+    or blank saved fields fall back to the default instead of surfacing an
+    empty clause -- same discipline as `_read_state`/model_discovery.py."""
+    try:
+        doc = await ctx.store.get(PROMPT_CONFIG_COLLECTION, PROMPT_CONFIG_KEY)
+    except Exception:
+        doc = None
+    config = dict(DEFAULT_PROMPT_CONFIG)
+    if doc is not None:
+        raw = getattr(doc, "data", None) or {}
+        if isinstance(raw, dict):
+            for key in config:
+                value = raw.get(key)
+                if value not in (None, ""):
+                    config[key] = value
+    return config
+
+
+async def save_prompt_config(ctx, updates: dict) -> dict:
+    """Merge `updates` onto the current saved config and persist it.
+
+    A blank text field is IGNORED, not saved as empty -- pasting an empty
+    textarea then clicking Apply Changes must fall back to the built-in
+    default on next read, never blank out the clause entirely.
+    `score_alert_threshold` is clamped to 0-100 and any non-numeric value
+    is ignored the same way.
+    """
+    config = await get_prompt_config(ctx)
+    for key, value in updates.items():
+        if key not in config:
+            continue
+        if key == "score_alert_threshold":
+            try:
+                value = max(0, min(100, int(value)))
+            except (TypeError, ValueError):
+                continue
+        else:
+            value = str(value).strip()
+            if not value:
+                continue
+        config[key] = value
+    try:
+        await ctx.store.update(PROMPT_CONFIG_COLLECTION, PROMPT_CONFIG_KEY, config)
+    except Exception:
+        try:
+            await ctx.store.create(PROMPT_CONFIG_COLLECTION,
+                                    {"id": PROMPT_CONFIG_KEY, **config})
+        except Exception:
+            pass
+    return config
+
+
 def _role_bucket(role: str) -> str:
     return "featured" if role == "featured" else "inline"
 
@@ -176,7 +245,9 @@ def analyze_prompt(prompt: str) -> dict:
     return {"score": score, "covered": covered, "missing": missing}
 
 
-def fix_prompt(prompt: str, role: str = "featured") -> tuple[str, list[str], list[str]]:
+def fix_prompt(
+    prompt: str, role: str = "featured", config: dict | None = None,
+) -> tuple[str, list[str], list[str]]:
     """Deterministically fix ONLY the structural slots this engine is
     allowed to fill without guessing real content (lighting, camera,
     generic style-fallback). Returns (fixed_prompt, additions, unfixable).
@@ -186,7 +257,22 @@ def fix_prompt(prompt: str, role: str = "featured") -> tuple[str, list[str], lis
     carries any of {"subject", "environment"} still missing after the fix:
     those need real words from the caller (article_title/summary/context),
     which this engine will never invent.
+
+    `config`, if given, is an effective config dict shaped like
+    `DEFAULT_PROMPT_CONFIG` (as returned by `get_prompt_config`) -- lets a
+    caller apply the user's saved Image Prompt engine settings instead of
+    the hardcoded module defaults. Omitted/None keeps the exact original
+    behaviour (module constants), so every existing synchronous caller and
+    test needs no change.
     """
+    cfg = config or DEFAULT_PROMPT_CONFIG
+    generic_lighting = cfg.get("generic_lighting") or _GENERIC_LIGHTING
+    generic_camera = {
+        "featured": cfg.get("generic_camera_featured") or _GENERIC_CAMERA["featured"],
+        "inline": cfg.get("generic_camera_inline") or _GENERIC_CAMERA["inline"],
+    }
+    generic_style = cfg.get("generic_style") or _GENERIC_STYLE
+
     text = (prompt or "").strip()
     analysis = analyze_prompt(text)
     missing = set(analysis["missing"])
@@ -194,19 +280,19 @@ def fix_prompt(prompt: str, role: str = "featured") -> tuple[str, list[str], lis
     fixed = text
 
     if "lighting" in missing:
-        fixed = f"{fixed} {_GENERIC_LIGHTING}".strip()
-        additions.append(f"Added lighting clause: \"{_GENERIC_LIGHTING}\"")
+        fixed = f"{fixed} {generic_lighting}".strip()
+        additions.append(f"Added lighting clause: \"{generic_lighting}\"")
         missing.discard("lighting")
 
     if "technical" in missing:
-        camera_clause = _GENERIC_CAMERA[_role_bucket(role)]
+        camera_clause = generic_camera[_role_bucket(role)]
         fixed = f"{fixed} {camera_clause}".strip()
         additions.append(f"Added camera/lens clause: \"{camera_clause}\"")
         missing.discard("technical")
 
     if "style" in missing:
-        fixed = f"{fixed} Style: {_GENERIC_STYLE}.".strip()
-        additions.append(f"Added generic style fallback: \"{_GENERIC_STYLE}\"")
+        fixed = f"{fixed} Style: {generic_style}.".strip()
+        additions.append(f"Added generic style fallback: \"{generic_style}\"")
         missing.discard("style")
 
     unfixable = sorted(missing & {"subject", "environment", "composition"})
@@ -216,7 +302,7 @@ def fix_prompt(prompt: str, role: str = "featured") -> tuple[str, list[str], lis
 def generate_prompt(
     role: str, article_title: str, summary: str, style_direction: str,
     lang: str = "", text_policy: str = shared.TEXT_POLICY_NO_TEXT,
-    image_text: str = "",
+    image_text: str = "", config: dict | None = None,
 ) -> str:
     """The engine's own entry point for BRIEF-TIME prompt generation --
     same inputs/output shape as `shared.prompt_for_role`, but auto-enriched
@@ -225,11 +311,15 @@ def generate_prompt(
     mention either). This is the function `create_media_brief` calls; the
     underlying `shared.prompt_for_role` keeps working exactly as before for
     any other caller/test that still calls it directly.
+
+    `config`: see `fix_prompt` -- pass the user's saved settings (fetched
+    once via `await get_prompt_config(ctx)`) so brief-time generation
+    reflects whatever was last saved from App settings.
     """
     base = shared.prompt_for_role(
         role, article_title, summary, style_direction, lang, text_policy, image_text,
     )
-    fixed, _additions, _unfixable = fix_prompt(base, role)
+    fixed, _additions, _unfixable = fix_prompt(base, role, config)
     return fixed
 
 
@@ -316,7 +406,14 @@ async def run_self_review(ctx, *, ts: float | None = None) -> dict:
     recent prompts. Always returns a full result and always gets logged by
     the caller -- this function itself never writes the permanent log, so
     the manual `check_prompt_engine_updates` tool and the scheduled tick
-    share EXACTLY one code path with no drift between them."""
+    share EXACTLY one code path with no drift between them.
+
+    The alert threshold is the user's saved `score_alert_threshold` (App
+    settings > Image Prompt engine), falling back to the module default --
+    fetched fresh here so a threshold change takes effect on the very next
+    run without needing a redeploy."""
+    config = await get_prompt_config(ctx)
+    alert_threshold = config.get("score_alert_threshold", SCORE_ALERT_THRESHOLD)
     state = await _read_state(ctx)
     old_hashes: dict = dict(state.get("guide_hashes") or {})
     new_hashes: dict[str, str] = {}
@@ -339,7 +436,7 @@ async def run_self_review(ctx, *, ts: float | None = None) -> dict:
     avg_score = round(sum(scores) / len(scores)) if scores else None
 
     review_recommended = bool(guides_changed) or (
-        avg_score is not None and avg_score < SCORE_ALERT_THRESHOLD
+        avg_score is not None and avg_score < alert_threshold
     )
 
     notes = []
@@ -347,8 +444,8 @@ async def run_self_review(ctx, *, ts: float | None = None) -> dict:
         notes.append(
             f"{len(guides_changed)} guide(s) changed since last check: "
             f"{', '.join(guides_changed)} -- read the page and decide by hand "
-            "whether SLOT_KEYWORDS/_GENERIC_LIGHTING/_GENERIC_CAMERA in "
-            "prompt_engine.py need updating. Never auto-applied."
+            "whether SLOT_KEYWORDS/the generic clauses in App settings > "
+            "Image Prompt engine need updating. Never auto-applied."
         )
     if guides_unreachable:
         notes.append(f"Could not reach: {', '.join(guides_unreachable)} (skipped, kept last-known hash).")
@@ -356,7 +453,7 @@ async def run_self_review(ctx, *, ts: float | None = None) -> dict:
         notes.append(
             f"Sampled {len(sample)} recent generated prompt(s), average rubric "
             f"score {avg_score}/100."
-            + (" Below alert threshold -- review recommended." if avg_score < SCORE_ALERT_THRESHOLD else "")
+            + (" Below alert threshold -- review recommended." if avg_score < alert_threshold else "")
         )
     else:
         notes.append("No generated prompts found yet to sample.")

@@ -387,12 +387,13 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             c.MEDIA_PROMPT_NOT_ENGLISH,
         )
 
+    prompt_config = await pe.get_prompt_config(ctx)
     roles = roles_for(params.inline_count)
     assets = []
     for role in roles:
         prompt = pe.generate_prompt(
             role, params.article_title, params.summary, params.style_direction,
-            params.lang.strip(), text_policy, image_text,
+            params.lang.strip(), text_policy, image_text, prompt_config,
         )
         resolved_model = _resolve_asset_model(
             role, model_choice, prompt, params.style_direction,

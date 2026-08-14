@@ -182,7 +182,10 @@ async def packages_nav_panel(ctx, site: str = "", show_add_project: str = "", **
 # could never see whether new models had been found. This screen replaces
 # both old screens and adds the missing discovery section.
 
-def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dict]) -> ui.UINode:
+def _settings_view(
+    ctx, connections: list, log: list[dict], prompt_log: list[dict],
+    prompt_config: dict | None = None,
+) -> ui.UINode:
     """App settings screen. UI_INTERFACE_STANDARD.md rule 1-3 (one button,
     one screen, everything configurable) PLUS the tabs-first navigation
     rule: ui.Tabs is the primary navigator across sub-sections, not a flat
@@ -250,6 +253,7 @@ def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dic
     discovery_tab = ui.Stack(direction="v", gap=2, children=discovery_children)
 
     # -- Image Prompt engine tab (monthly self-review, visible here too) -
+    prompt_config = prompt_config or {}
     prompt_children: list[ui.UINode] = [
         ui.Text(
             content="Media Hub checks once a month whether its own image "
@@ -262,6 +266,47 @@ def _settings_view(ctx, connections: list, log: list[dict], prompt_log: list[dic
         ui.Button(
             "Check now", icon="RefreshCw", variant="secondary",
             size="sm", on_click=ui.Call("check_prompt_engine_updates"),
+        ),
+        ui.Divider(),
+        ui.Header(text="Settings", level=3,
+                   subtitle="The generic clauses this engine falls back to, "
+                            "and the review alert threshold. Leave a field "
+                            "blank to keep its current value."),
+        ui.Form(
+            action="save_prompt_engine_config",
+            submit_label="Apply Changes",
+            children=[
+                ui.Text("Generic lighting clause", variant="label"),
+                ui.TextArea(
+                    param_name="generic_lighting",
+                    placeholder="Appended when a prompt has no lighting language.",
+                    value=prompt_config.get("generic_lighting", ""),
+                ),
+                ui.Text("Generic camera/lens clause -- featured", variant="label"),
+                ui.TextArea(
+                    param_name="generic_camera_featured",
+                    placeholder="Appended to FEATURED prompts missing camera/lens language.",
+                    value=prompt_config.get("generic_camera_featured", ""),
+                ),
+                ui.Text("Generic camera/lens clause -- inline", variant="label"),
+                ui.TextArea(
+                    param_name="generic_camera_inline",
+                    placeholder="Appended to INLINE prompts missing camera/lens language.",
+                    value=prompt_config.get("generic_camera_inline", ""),
+                ),
+                ui.Text("Generic style fallback", variant="label"),
+                ui.Input(
+                    param_name="generic_style",
+                    placeholder="Appended when a prompt names no style/medium at all.",
+                    value=prompt_config.get("generic_style", ""),
+                ),
+                ui.Text("Review alert threshold (0-100)", variant="label"),
+                ui.Input(
+                    param_name="score_alert_threshold",
+                    placeholder=str(prompt_config.get("score_alert_threshold", "")),
+                    value=str(prompt_config.get("score_alert_threshold", "")),
+                ),
+            ],
         ),
     ]
     if prompt_log:
@@ -587,7 +632,8 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
     if view in ("settings", "connect", "providers"):
         log = await md.list_log(ctx, limit=5)
         prompt_log = await pe.list_review_log(ctx, limit=5)
-        return _settings_view(ctx, connections, log, prompt_log)
+        prompt_config = await pe.get_prompt_config(ctx)
+        return _settings_view(ctx, connections, log, prompt_log, prompt_config)
     if view == "editor" or package_id:
         if not package_id or package_id == "new":
             return _editor_new(ctx, any_connected, site=site)

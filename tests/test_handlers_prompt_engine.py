@@ -13,7 +13,13 @@ import pytest
 
 import handlers_prompt_engine as hpe
 import prompt_engine as pe
-from models import AnalyzePromptParams, FixPromptParams, CheckPromptEngineUpdatesParams, ListPromptEngineLogParams
+from models import (
+    AnalyzePromptParams,
+    CheckPromptEngineUpdatesParams,
+    FixPromptParams,
+    ListPromptEngineLogParams,
+    SavePromptEngineConfigParams,
+)
 
 
 @pytest.mark.asyncio
@@ -97,3 +103,52 @@ async def test_schedule_tick_runs_and_logs_when_due(ctx):
     # raised and the log is a valid list.
     log_after = await pe.list_review_log(ctx, limit=10)
     assert isinstance(log_after, list)
+
+
+# --------------------------- get/save_prompt_engine_config ----------------
+
+@pytest.mark.asyncio
+async def test_get_prompt_engine_config_returns_defaults(ctx):
+    result = await hpe.get_prompt_engine_config(ctx, CheckPromptEngineUpdatesParams())
+    assert result.status == "success"
+    assert result.data.generic_lighting == pe.DEFAULT_PROMPT_CONFIG["generic_lighting"]
+    assert result.data.score_alert_threshold == pe.SCORE_ALERT_THRESHOLD
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_engine_config_applies_an_edit(ctx):
+    result = await hpe.save_prompt_engine_config(
+        ctx, SavePromptEngineConfigParams(generic_lighting="A brand new lighting clause."),
+    )
+    assert result.status == "success"
+    assert result.data.generic_lighting == "A brand new lighting clause."
+    # a later fix_prompt call, given the saved config, actually uses it
+    config = await pe.get_prompt_config(ctx)
+    fixed, _, _ = pe.fix_prompt("A heat pump.", "featured", config)
+    assert "A brand new lighting clause." in fixed
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_engine_config_rejects_a_non_numeric_threshold(ctx):
+    result = await hpe.save_prompt_engine_config(
+        ctx, SavePromptEngineConfigParams(score_alert_threshold="not-a-number"),
+    )
+    assert result.status == "error"
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_engine_config_rejects_an_out_of_range_threshold(ctx):
+    result = await hpe.save_prompt_engine_config(
+        ctx, SavePromptEngineConfigParams(score_alert_threshold="500"),
+    )
+    assert result.status == "error"
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_engine_config_blank_fields_keep_current_value(ctx):
+    await hpe.save_prompt_engine_config(
+        ctx, SavePromptEngineConfigParams(generic_lighting="Kept clause."),
+    )
+    result = await hpe.save_prompt_engine_config(ctx, SavePromptEngineConfigParams())
+    assert result.status == "success"
+    assert result.data.generic_lighting == "Kept clause."

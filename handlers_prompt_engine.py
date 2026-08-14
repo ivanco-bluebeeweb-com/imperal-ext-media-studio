@@ -25,8 +25,10 @@ from models import (
     FixPromptParams,
     ListPromptEngineLogParams,
     PromptAnalysis,
+    PromptEngineConfig,
     PromptEngineLogEntry,
     PromptEngineReviewResult,
+    SavePromptEngineConfigParams,
 )
 from shared import error as _error
 
@@ -83,7 +85,8 @@ async def fix_prompt(ctx, params: FixPromptParams) -> ActionResult:
             "Nothing to fix -- pass the prompt text in `prompt`.",
             c.MEDIA_PROMPT_EMPTY,
         )
-    fixed, additions, unfixable = pe.fix_prompt(params.prompt, params.role or "featured")
+    config = await pe.get_prompt_config(ctx)
+    fixed, additions, unfixable = pe.fix_prompt(params.prompt, params.role or "featured", config)
     entity = FixedPrompt(
         id="fix", title="Fixed prompt", original_prompt=params.prompt,
         fixed_prompt=fixed, additions=additions, unfixable_issues=unfixable,
@@ -182,3 +185,79 @@ async def media_prompt_engine_review(ctx) -> None:
         await ctx.log(
             f"prompt engine review: recommended -- {result.note}", "info",
         )
+
+
+@chat.function(
+    "get_prompt_engine_config",
+    "Read the Image Prompt engine's current editable settings (generic "
+    "lighting/camera/style fallback clauses and the review alert "
+    "threshold) -- what App settings > Image Prompt engine shows.",
+    action_type="read",
+    data_model=PromptEngineConfig,
+    event="media-studio.get_prompt_engine_config",
+)
+async def get_prompt_engine_config(ctx, params: CheckPromptEngineUpdatesParams) -> ActionResult:
+    """Read the effective (saved-or-default) prompt engine config."""
+    config = await pe.get_prompt_config(ctx)
+    entity = PromptEngineConfig(
+        id="prompt-engine-config", title="Image Prompt engine settings",
+        generic_lighting=config["generic_lighting"],
+        generic_camera_featured=config["generic_camera_featured"],
+        generic_camera_inline=config["generic_camera_inline"],
+        generic_style=config["generic_style"],
+        score_alert_threshold=int(config["score_alert_threshold"]),
+    )
+    return ActionResult.success(entity, "Current Image Prompt engine settings.")
+
+
+@chat.function(
+    "save_prompt_engine_config",
+    "Apply edited Image Prompt engine settings from the App settings > "
+    "Image Prompt engine tab: the generic lighting/camera/style fallback "
+    "clauses this engine appends when a prompt is missing them, and the "
+    "review alert threshold. A blank field keeps its current value -- "
+    "nothing is ever blanked out by omission. Takes effect immediately, "
+    "on the very next brief/fix/review, no redeploy needed.",
+    action_type="write",
+    chain_callable=True,
+    data_model=PromptEngineConfig,
+    event="media-studio.save_prompt_engine_config",
+    effects=["media-studio.prompt_engine_config.updated"],
+)
+async def save_prompt_engine_config(
+    ctx, params: SavePromptEngineConfigParams,
+) -> ActionResult:
+    """Merge and persist the Image Prompt engine's editable settings."""
+    updates: dict = {
+        "generic_lighting": params.generic_lighting.strip(),
+        "generic_camera_featured": params.generic_camera_featured.strip(),
+        "generic_camera_inline": params.generic_camera_inline.strip(),
+        "generic_style": params.generic_style.strip(),
+    }
+    threshold_raw = params.score_alert_threshold.strip()
+    if threshold_raw:
+        try:
+            threshold = int(threshold_raw)
+        except ValueError:
+            return _error(
+                f"'{threshold_raw}' isn't a whole number -- "
+                "score_alert_threshold must be 0-100.",
+                c.MEDIA_PROMPT_CONFIG_INVALID,
+            )
+        if not (0 <= threshold <= 100):
+            return _error(
+                "score_alert_threshold must be between 0 and 100.",
+                c.MEDIA_PROMPT_CONFIG_INVALID,
+            )
+        updates["score_alert_threshold"] = threshold
+
+    config = await pe.save_prompt_config(ctx, updates)
+    entity = PromptEngineConfig(
+        id="prompt-engine-config", title="Image Prompt engine settings",
+        generic_lighting=config["generic_lighting"],
+        generic_camera_featured=config["generic_camera_featured"],
+        generic_camera_inline=config["generic_camera_inline"],
+        generic_style=config["generic_style"],
+        score_alert_threshold=int(config["score_alert_threshold"]),
+    )
+    return ActionResult.success(entity, "Image Prompt engine settings applied.")

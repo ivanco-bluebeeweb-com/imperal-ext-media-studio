@@ -29,6 +29,53 @@ def test_analyze_prompt_empty_scores_zero_and_flags_all_missing():
     assert set(result["missing"]) == set(pe.SLOT_KEYWORDS.keys())
 
 
+# --------------------------- get_prompt_config / save_prompt_config -------
+
+@pytest.mark.asyncio
+async def test_get_prompt_config_returns_defaults_when_unconfigured(ctx):
+    config = await pe.get_prompt_config(ctx)
+    assert config == pe.DEFAULT_PROMPT_CONFIG
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_config_persists_an_override(ctx):
+    await pe.save_prompt_config(ctx, {"generic_lighting": "Custom lighting clause."})
+    config = await pe.get_prompt_config(ctx)
+    assert config["generic_lighting"] == "Custom lighting clause."
+    # untouched fields keep their defaults
+    assert config["generic_style"] == pe.DEFAULT_PROMPT_CONFIG["generic_style"]
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_config_ignores_blank_fields(ctx):
+    await pe.save_prompt_config(ctx, {"generic_lighting": "Custom lighting clause."})
+    await pe.save_prompt_config(ctx, {"generic_lighting": ""})  # blank -> keep
+    config = await pe.get_prompt_config(ctx)
+    assert config["generic_lighting"] == "Custom lighting clause."
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_config_clamps_score_alert_threshold(ctx):
+    await pe.save_prompt_config(ctx, {"score_alert_threshold": 500})
+    config = await pe.get_prompt_config(ctx)
+    assert config["score_alert_threshold"] == 100
+
+
+@pytest.mark.asyncio
+async def test_save_prompt_config_ignores_non_numeric_threshold(ctx):
+    await pe.save_prompt_config(ctx, {"score_alert_threshold": "not-a-number"})
+    config = await pe.get_prompt_config(ctx)
+    assert config["score_alert_threshold"] == pe.SCORE_ALERT_THRESHOLD
+
+
+def test_fix_prompt_uses_a_custom_config_when_given():
+    config = dict(pe.DEFAULT_PROMPT_CONFIG)
+    config["generic_lighting"] = "A very particular custom lighting clause."
+    fixed, additions, _ = pe.fix_prompt("A modern heat pump.", "featured", config)
+    assert "A very particular custom lighting clause." in fixed
+    assert any("A very particular custom lighting clause." in a for a in additions)
+
+
 def test_analyze_prompt_bare_subject_only_covers_one_slot():
     result = pe.analyze_prompt("A modern heat pump beside a bright house.")
     assert "subject" in result["covered"]

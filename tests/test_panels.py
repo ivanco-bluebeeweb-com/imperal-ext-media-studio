@@ -67,6 +67,31 @@ async def test_settings_screen_surfaces_model_discovery_previously_chat_only(ctx
 
 
 @pytest.mark.asyncio
+async def test_settings_screen_prompt_engine_tab_has_apply_changes_form(ctx):
+    """The Image Prompt engine tab must expose its editable clauses as
+    text areas plus a single 'Apply Changes' submit button that calls the
+    save_prompt_engine_config tool -- not just the read-only 'Check now'
+    self-review button that existed before."""
+    node = await panels.studio_panel(ctx, view="settings")
+    rendered = repr(node)
+    assert "Apply Changes" in rendered
+    assert "save_prompt_engine_config" in rendered
+    assert "generic_lighting" in rendered
+    assert "score_alert_threshold" in rendered
+
+
+@pytest.mark.asyncio
+async def test_settings_screen_prompt_engine_tab_prefills_saved_values(ctx):
+    """A previously saved override must show up pre-filled in the form,
+    not just the built-in defaults."""
+    import prompt_engine as pe
+    await pe.save_prompt_config(ctx, {"generic_lighting": "A very specific saved clause."})
+    node = await panels.studio_panel(ctx, view="settings")
+    rendered = repr(node)
+    assert "A very specific saved clause." in rendered
+
+
+@pytest.mark.asyncio
 async def test_old_connect_and_providers_views_still_resolve_to_settings(ctx):
     """Old ui.Call(view='connect') / view='providers') call sites (if any
     survive in a cached client) must land somewhere sensible, not a blank
