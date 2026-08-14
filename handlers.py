@@ -1037,7 +1037,7 @@ async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
         non_english = contains_non_english_text(description)
         if non_english:
             return _error(
-                "Image description must be written in English -- Magnific Mystic is tuned "
+                "Image Prompt must be written in English -- Magnific Mystic is tuned "
                 f"for English input. Found non-English text: '{non_english[:40]}'.",
                 c.MEDIA_PROMPT_NOT_ENGLISH,
             )

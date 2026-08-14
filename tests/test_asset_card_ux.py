@@ -51,7 +51,7 @@ def test_asset_card_labels_original_upscaled_and_metadata_clearly():
         "Save Changes",
         "Alt text",
         "Caption",
-        "Image description",
+        "Image Prompt",
     ):
         assert label in rendered
     assert rendered.count("Featured Image") == 1

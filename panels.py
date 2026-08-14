@@ -369,7 +369,7 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
         children=[
             ui.Text("Image title", variant="label"),
             ui.Input(param_name="image_title", placeholder="A clear file title", value=image_title),
-            ui.Text("Image description", variant="label"),
+            ui.Text("Image Prompt", variant="label"),
             ui.TextArea(
                 param_name="image_description",
                 placeholder="Describe the image to generate, in English",
