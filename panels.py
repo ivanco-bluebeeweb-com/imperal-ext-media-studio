@@ -152,37 +152,23 @@ async def _projects_section(ctx, site: str, show_add_project: str) -> ui.UINode:
             "media-studio.disconnect_magnific,media-studio.create_project",
 )
 async def packages_nav_panel(ctx, site: str = "", show_add_project: str = "", **kwargs) -> ui.UINode:
-    """Projects list PLUS a permanent connection-status row.
+    """Projects list PLUS a single 'App settings' entry point.
 
-    The status row is the fix for "I don't understand how to connect
-    Magnific from the interface": it is visible every time this panel
-    renders, not something the user has to already know to look for, and it
-    is the same row whether zero, one, or (later) several providers exist.
+    UI_INTERFACE_STANDARD.md / sidebar-cards rule: no visually-boxed
+    container (no title/subtitle Card) for this block -- just the button,
+    after a Divider. Provider connection status (Magnific, and later other
+    providers) lives INSIDE the settings screen itself, not duplicated here
+    as a preview line -- one place to look, not two.
     """
-    connections = await list_provider_connections(ctx)
-    any_connected = any(c.connected for c in connections)
-
     projects_section = await _projects_section(ctx, site, show_add_project)
 
-    status_row = ui.Stack(
-        direction="v", gap=2,
-        children=[
-            ui.Header(text="Providers", level=3),
-            ui.Text(
-                content=(
-                    "Magnific connected" if any_connected
-                    else "No provider connected yet"
-                ),
-                variant="caption",
-            ),
-            ui.Button(
-                "App settings", icon="Settings", variant="secondary", size="sm",
-                on_click=ui.Call("__panel__studio", view="settings"),
-            ),
-        ],
+    settings_button = ui.Button(
+        "App settings", icon="Settings", variant="secondary", size="sm",
+        full_width=True,
+        on_click=ui.Call("__panel__studio", view="settings"),
     )
 
-    return ui.Stack(children=[projects_section, ui.Divider(), status_row], gap=3)
+    return ui.Stack(children=[projects_section, ui.Divider(), settings_button], gap=3)
 
 
 # ── App settings screen -- EVERYTHING configurable, one place ──────────────
