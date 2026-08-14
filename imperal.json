@@ -4207,7 +4207,7 @@
     }
   ],
   "required_scopes": [],
-  "icon_size_bytes": 80553,
+  "icon_size_bytes": 4431,
   "exposed": [
     {
       "name": "register_project",
