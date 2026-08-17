@@ -5138,13 +5138,18 @@
       "analyze_prompt": 0,
       "fix_prompt": 0,
       "check_prompt_engine_updates": 12,
-      "list_prompt_engine_log": 0
+      "list_prompt_engine_log": 0,
+      "update_project": 8,
+      "update_brief_overview": 8,
+      "get_prompt_engine_config": 0,
+      "save_prompt_engine_config": 8
     },
     "free_tools": [
       "analyze_prompt",
       "connect_magnific",
       "fix_prompt",
       "get_media_package",
+      "get_prompt_engine_config",
       "list_media_packages",
       "list_model_discovery_log",
       "list_prompt_engine_log",
