@@ -51,8 +51,29 @@ class Project(sdl.Entity):
     """One project = one connected site we make media briefs for."""
     site_id: str = ""
     name: str = ""
+    about: str = ""                    # "О проекте" -- free text: what this site/brand is, audience, notes
+    default_style_direction: str = ""  # prefilled into every new brief's style_direction for this project
+    default_lang: str = ""             # prefilled into every new brief's lang for this project
     brief_count: int = 0
     created_at: str = ""
+
+
+class UpdateProjectParams(BaseModel):
+    site_id: str = Field(description="The project's site_id, from list_projects.")
+    about: str = Field(
+        "", description="\"О проекте\" -- free text describing what this site/brand "
+                        "is, its audience, and any notes useful to whoever works this "
+                        "project. Empty string clears it; omit the field entirely "
+                        "(don't pass it) to leave unchanged -- but since this is a "
+                        "plain string param, pass the CURRENT value back if you don't "
+                        "want to change it.")
+    default_style_direction: str = Field(
+        "", description="Default style_direction pre-filled into every NEW brief "
+                        "created for this project (e.g. 'industrial, realistic, no "
+                        "text, blue/grey palette'). A brief can still override it.")
+    default_lang: str = Field(
+        "", description="Default lang pre-filled into every NEW brief created for "
+                        "this project, e.g. 'ru', 'ro'.")
 
 
 class CreateMediaBriefParams(BaseModel):
@@ -238,9 +259,19 @@ class MediaPackage(sdl.Entity):
     model: str = ""              # Mystic model for this brief, "" = provider default
     lang: str = ""                # post's own language, e.g. 'ru'/'ro' -- alt/caption wording
     native_title: str = ""        # article title in lang, used for alt/caption only
+    media_strategy: str = ""      # "О брифе" -- the media strategy for this one content unit: why these images, what they must communicate, how they support the article
     assets: list[MediaAsset] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
+
+
+class UpdateBriefOverviewParams(BaseModel):
+    package_id: str = Field(description="The media package id, from list_media_packages.")
+    media_strategy: str = Field(
+        "", description="\"О брифе\" -- the media strategy for this content unit: "
+                        "why these specific images, what each must visually "
+                        "communicate, how they support the article's angle and "
+                        "the reader's journey through it. Free text.")
 
 
 class ModelDiscoveryFinding(sdl.Entity):

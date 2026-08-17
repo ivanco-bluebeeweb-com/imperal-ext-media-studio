@@ -511,7 +511,11 @@ def _asset_card(package_id: str, asset: dict) -> ui.UINode:
     )
 
 
-def _editor_new(ctx, any_connected: bool, site: str = "") -> ui.UINode:
+async def _editor_new(ctx, any_connected: bool, site: str = "") -> ui.UINode:
+    """New-brief form. When `site` names a project with saved defaults
+    (Project Overview tab -> default_style_direction / default_lang), those
+    pre-fill this form's own fields -- a real default, not just stored text
+    -- while staying fully editable/overridable per brief."""
     children: list[ui.UINode] = [ui.Header(text="New media brief", level=3)]
 
     if not any_connected:
@@ -526,6 +530,15 @@ def _editor_new(ctx, any_connected: bool, site: str = "") -> ui.UINode:
             on_click=ui.Call("__panel__studio", view="settings"),
         ))
 
+    default_style = ""
+    default_lang = ""
+    if site:
+        projects = await st.list_projects(ctx)
+        project = next((p for p in projects if p["site_id"] == site), None)
+        if project:
+            default_style = project.get("default_style_direction", "")
+            default_lang = project.get("default_lang", "")
+
     children.append(ui.Form(
         action="create_media_brief",
         submit_label="Create brief",
@@ -535,7 +548,9 @@ def _editor_new(ctx, any_connected: bool, site: str = "") -> ui.UINode:
             ui.TextArea(param_name="summary", placeholder="Short summary / angle",
                         rows=4),
             ui.Input(param_name="style_direction",
-                     placeholder="Style direction (optional)"),
+                     placeholder="Style direction (optional)", value=default_style),
+            ui.Input(param_name="lang",
+                     placeholder="Post language, e.g. ru, ro (optional)", value=default_lang),
             ui.Slider(param_name="inline_count", min=0, max=8, value=2,
                       label="Inline images besides featured"),
             ui.Select(param_name="model", options=_MODEL_OPTIONS, value="",
@@ -547,22 +562,38 @@ def _editor_new(ctx, any_connected: bool, site: str = "") -> ui.UINode:
 
     return ui.Stack(children=children, gap=4)
 
+def _brief_overview_tab(package_id: str, row: dict) -> ui.UINode:
+    """Brief Overview tab content: \"О брифе\" -- the media strategy for this
+    one content unit (why these images, what they must communicate, how
+    they support the article). Editable in place via update_brief_overview.
+    """
+    return ui.Stack(children=[
+        ui.Text(
+            "Why these specific images exist, what each must visually "
+            "communicate, and how they support this article's angle and "
+            "the reader's journey through it.",
+            variant="caption",
+        ),
+        ui.Form(
+            action="update_brief_overview",
+            submit_label="Save Changes",
+            defaults={"package_id": package_id},
+            children=[
+                ui.Text("О брифе", variant="label"),
+                ui.TextArea(
+                    param_name="media_strategy",
+                    placeholder="The media strategy for this content unit...",
+                    value=row.get("media_strategy", ""), rows=6,
+                ),
+            ],
+        ),
+    ], gap=3)
 
-async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINode:
-    row = await st.get_package(ctx, package_id)
-    if row is None:
-        return ui.Empty(message="This media package no longer exists.")
 
+def _brief_assets_tab(package_id: str, row: dict, any_connected: bool) -> ui.UINode:
+    """Second tab: the previous top-level content of a brief's detail page
+    (unchanged) -- Generate all / Close actions plus the asset grid."""
     assets = row.get("assets", [])
-    header_badges = [_status_badge(row.get("status", "draft"))]
-    if row.get("model"):
-        header_badges.append(ui.Badge(label="Model", value=row["model"], color="purple"))
-    header = ui.Stack(children=[
-        ui.Header(text=row.get("article_title") or "(untitled brief)",
-                   level=3, subtitle=row.get("site", "")),
-        ui.Stack(children=header_badges, direction="h", gap=2),
-    ], direction="h", justify="between")
-
     generate_disabled = row.get("status") == "generating" or not any_connected
 
     action_children = [
@@ -576,15 +607,7 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
     ]
     actions = ui.Stack(children=action_children, direction="h")
 
-    children: list[ui.UINode] = [
-        ui.Stack(children=[
-            ui.Button(
-                "All media briefs", icon="ArrowLeft", variant="ghost", size="sm",
-                on_click=ui.Call("__panel__studio", view="", package_id=""),
-            ),
-        ], direction="h", justify="start"),
-        header,
-    ]
+    children: list[ui.UINode] = []
     if not any_connected:
         children.append(ui.Alert(
             title="Connect Magnific to generate",
@@ -593,12 +616,46 @@ async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINo
             type="warning",
         ))
     children.append(actions)
-    children.append(ui.Grid(
-        children=[_asset_card(package_id, a) for a in assets],
-        columns=2,
-    ))
+    children.append(ui.Grid(children=[
+        _asset_card(package_id, row.get("site", ""), a) for a in assets
+    ], columns=2, gap=4))
 
     return ui.Stack(children=children, gap=4)
+
+
+async def _editor_existing(ctx, package_id: str, any_connected: bool) -> ui.UINode:
+    row = await st.get_package(ctx, package_id)
+    if row is None:
+        return ui.Empty(message="This media package no longer exists.")
+
+    header_badges = [_status_badge(row.get("status", "draft"))]
+    if row.get("model"):
+        header_badges.append(ui.Badge(label="Model", value=row["model"], color="purple"))
+    header = ui.Stack(children=[
+        ui.Header(text=row.get("article_title") or "(untitled brief)",
+                   level=3, subtitle=row.get("site", "")),
+        ui.Stack(children=header_badges, direction="h", gap=2),
+    ], direction="h", justify="between")
+
+    children: list[ui.UINode] = [
+        ui.Stack(children=[
+            ui.Button(
+                "All media briefs", icon="ArrowLeft", variant="ghost", size="sm",
+                on_click=ui.Call("__panel__studio", view="", package_id=""),
+            ),
+        ], direction="h", justify="start"),
+        header,
+        ui.Tabs(tabs=[
+            {"label": "Brief Overview", "content": _brief_overview_tab(package_id, row)},
+            {"label": "Assets", "content": _brief_assets_tab(package_id, row, any_connected)},
+        ]),
+    ]
+
+    return ui.Stack(children=children, gap=4)
+
+
+
+
 
 
 # ── ONE center panel, view-switched ─────────────────────────────────────────
@@ -636,7 +693,7 @@ async def studio_panel(ctx, **kwargs) -> ui.UINode:
         return _settings_view(ctx, connections, log, prompt_log, prompt_config)
     if view == "editor" or package_id:
         if not package_id or package_id == "new":
-            return _editor_new(ctx, any_connected, site=site)
+            return await _editor_new(ctx, any_connected, site=site)
         return await _editor_existing(ctx, package_id, any_connected)
 
     return await _packages_view(ctx, any_connected, site=site)
@@ -672,37 +729,60 @@ def _brief_meta(row: dict) -> str:
     return " \u00b7 ".join(bits)
 
 
-async def _packages_view(ctx, any_connected: bool, site: str = "") -> ui.UINode:
-    """Central catalogue of media briefs -- every brief, or (when `site` is
-    given) just one project's briefs. Visually identical either way: only
-    the header text and the underlying query change.
+async def _project_overview_tab(ctx, site: str) -> ui.UINode:
+    """Project Overview tab content: \"О проекте\" plus the two per-project
+    defaults (style_direction, lang) that pre-fill every NEW brief created
+    for this project. Editable in place via one Form -> update_project.
 
-    Browsing, search and selection belong to the content area, where there is
-    room for them. The left sidebar deliberately contains only app-level
-    provider/settings controls.
-
-    WHY `ui.List(searchable=True)`, NOT OUR OWN SEARCH INPUT. The user wants
-    real as-you-type filtering over the FULL list already loaded from the
-    backend -- no submit button, no server round-trip per keystroke. This SDK
-    has exactly one component that behaves that way: `ui.List(searchable=True)`
-    filters client-side over items already on the page. A standalone
-    `ui.Input` here only fires `on_submit` (Enter), which is a step backwards.
-    The tradeoff (documented, not hidden): the List's own search box renders
-    INSIDE the List, so it cannot share a row with an external button --
-    that slot doesn't exist in this SDK. The "New brief" button instead sits
-    directly above the list, as close to it as layout allows.
+    Works even for an \"implicit\" project (one that only exists because a
+    brief already references this site, never explicitly created) -- the
+    form still submits fine; update_project auto-creates the row.
     """
-    rows = await st.list_packages(ctx, site=site, limit=100)
-    total = len(rows)
+    projects = await st.list_projects(ctx)
+    project = next((p for p in projects if p["site_id"] == site), None)
+    about = project.get("about", "") if project else ""
+    default_style = project.get("default_style_direction", "") if project else ""
+    default_lang = project.get("default_lang", "") if project else ""
 
-    if site:
-        projects = await st.list_projects(ctx)
-        project = next((p for p in projects if p["site_id"] == site), None)
-        project_label = project["name"] if project else site
-        header_text = f"{project_label} · Briefs ({total})"
-    else:
-        header_text = f"Media briefs ({total})"
+    return ui.Stack(children=[
+        ui.Text(
+            "Context for whoever works this project -- manually or through "
+            "this app alone. Defaults set here pre-fill every NEW brief; "
+            "an individual brief can still override them.",
+            variant="caption",
+        ),
+        ui.Form(
+            action="update_project",
+            submit_label="Save Changes",
+            defaults={"site_id": site},
+            children=[
+                ui.Text("О проекте", variant="label"),
+                ui.TextArea(
+                    param_name="about",
+                    placeholder="What this site/brand is, its audience, and any notes.",
+                    value=about, rows=4,
+                ),
+                ui.Text("Style direction по умолчанию", variant="label"),
+                ui.Input(
+                    param_name="default_style_direction",
+                    placeholder="e.g. industrial, realistic, no text, blue/grey palette",
+                    value=default_style,
+                ),
+                ui.Text("Язык по умолчанию (lang)", variant="label"),
+                ui.Input(
+                    param_name="default_lang",
+                    placeholder="e.g. ru, ro",
+                    value=default_lang,
+                ),
+            ],
+        ),
+    ], gap=3)
 
+
+def _packages_body(rows: list[dict], any_connected: bool, site: str, header_text: str) -> ui.UINode:
+    """The actual brief catalogue content -- header, New brief button,
+    optional provider warning, and the searchable list/empty state.
+    Shared by the unscoped view and the project-scoped 'Briefs' tab."""
     new_brief_action = ui.Call("__panel__studio", view="editor", package_id="new", site=site)
 
     children: list[ui.UINode] = [
@@ -747,3 +827,42 @@ async def _packages_view(ctx, any_connected: bool, site: str = "") -> ui.UINode:
         children.append(ui.List(items=items, searchable=True))
 
     return ui.Stack(children=children, gap=4)
+
+
+async def _packages_view(ctx, any_connected: bool, site: str = "") -> ui.UINode:
+    """Central catalogue of media briefs -- every brief, or (when `site` is
+    given) just one project's briefs.
+
+    Unscoped (no site): the brief catalogue only, unchanged.
+    Project-scoped (site set): wrapped in tabs -- 'Project Overview' first
+    ("О проекте" + default style_direction/lang for this project), then
+    'Briefs' with the exact same catalogue content as before.
+
+    WHY `ui.List(searchable=True)`, NOT OUR OWN SEARCH INPUT. The user wants
+    real as-you-type filtering over the FULL list already loaded from the
+    backend -- no submit button, no server round-trip per keystroke. This SDK
+    has exactly one component that behaves that way: `ui.List(searchable=True)`
+    filters client-side over items already on the page. A standalone
+    `ui.Input` here only fires `on_submit` (Enter), which is a step backwards.
+    The tradeoff (documented, not hidden): the List's own search box renders
+    INSIDE the List, so it cannot share a row with an external button --
+    that slot doesn't exist in this SDK. The "New brief" button instead sits
+    directly above the list, as close to it as layout allows.
+    """
+    rows = await st.list_packages(ctx, site=site, limit=100)
+    total = len(rows)
+
+    if site:
+        projects = await st.list_projects(ctx)
+        project = next((p for p in projects if p["site_id"] == site), None)
+        project_label = project["name"] if project else site
+        header_text = f"{project_label} · Briefs ({total})"
+        briefs_body = _packages_body(rows, any_connected, site, header_text)
+        overview = await _project_overview_tab(ctx, site)
+        return ui.Tabs(tabs=[
+            {"label": "Project Overview", "content": overview},
+            {"label": "Briefs", "content": briefs_body},
+        ])
+
+    header_text = f"Media briefs ({total})"
+    return _packages_body(rows, any_connected, site, header_text)

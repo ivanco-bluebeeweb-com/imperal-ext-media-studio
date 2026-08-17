@@ -4,6 +4,7 @@ import codes as c
 import handlers as h
 from models import (
     CreateMediaBriefParams,
+    CreateProjectParams,
     DeleteAssetImageParams,
     DeleteMediaPackageParams,
     GenerateMediaPackageParams,
@@ -11,6 +12,8 @@ from models import (
     ListMediaPackagesParams,
     RegenerateAssetParams,
     UpdateAssetMetaParams,
+    UpdateBriefOverviewParams,
+    UpdateProjectParams,
 )
 
 
@@ -548,3 +551,83 @@ async def test_delete_media_package_success_then_missing(ctx):
     again = await h.delete_media_package(ctx, DeleteMediaPackageParams(package_id=brief.data.id))
     assert again.status == "error"
     assert again.error_code == c.MEDIA_PACKAGE_NOT_FOUND
+
+
+# ── Project Overview: about / default_style_direction / default_lang ────────
+
+@pytest.mark.asyncio
+async def test_create_project_starts_with_empty_overview_fields(ctx):
+    result = await h.create_project(ctx, CreateProjectParams(site_id="g4s.md", name="G4S"))
+    assert result.status == "success"
+    assert result.data.about == ""
+    assert result.data.default_style_direction == ""
+    assert result.data.default_lang == ""
+
+
+@pytest.mark.asyncio
+async def test_update_project_sets_overview_fields(ctx):
+    await h.create_project(ctx, CreateProjectParams(site_id="g4s.md", name="G4S"))
+    result = await h.update_project(ctx, UpdateProjectParams(
+        site_id="g4s.md",
+        about="Security services provider in Moldova, B2B audience.",
+        default_style_direction="industrial, realistic, no text, blue/grey palette",
+        default_lang="ru",
+    ))
+    assert result.status == "success"
+    assert result.data.about == "Security services provider in Moldova, B2B audience."
+    assert result.data.default_style_direction == "industrial, realistic, no text, blue/grey palette"
+    assert result.data.default_lang == "ru"
+
+    projects = await h.st.list_projects(ctx)
+    row = next(p for p in projects if p["site_id"] == "g4s.md")
+    assert row["about"] == "Security services provider in Moldova, B2B audience."
+    assert row["default_lang"] == "ru"
+
+
+@pytest.mark.asyncio
+async def test_update_project_auto_creates_implicit_project(ctx):
+    """A project that only exists because a brief references its site_id
+    (never explicitly created) can still have its overview set -- the
+    update auto-creates the row instead of failing."""
+    await h.create_media_brief(ctx, CreateMediaBriefParams(
+        site="implicit.md", article_title="Some article", inline_count=0))
+    result = await h.update_project(ctx, UpdateProjectParams(
+        site_id="implicit.md", about="Now has an overview.",
+    ))
+    assert result.status == "success"
+    assert result.data.about == "Now has an overview."
+    assert result.data.site_id == "implicit.md"
+
+
+@pytest.mark.asyncio
+async def test_update_project_requires_site_id(ctx):
+    result = await h.update_project(ctx, UpdateProjectParams(site_id=""))
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_PROJECT_VALIDATION_FAILED
+
+
+# ── Brief Overview: media_strategy ("О брифе") ───────────────────────────────
+
+@pytest.mark.asyncio
+async def test_update_brief_overview_sets_media_strategy(ctx):
+    brief = await h.create_media_brief(ctx, CreateMediaBriefParams(
+        article_title="Heat pump guide", inline_count=1))
+    result = await h.update_brief_overview(ctx, UpdateBriefOverviewParams(
+        package_id=brief.data.id,
+        media_strategy="Featured image must show the product in context; "
+                        "inline image supports the installation step.",
+    ))
+    assert result.status == "success"
+    assert result.data.media_strategy.startswith("Featured image must show")
+
+    stored = await h.st.get_package(ctx, brief.data.id)
+    assert stored["media_strategy"].startswith("Featured image must show")
+
+
+@pytest.mark.asyncio
+async def test_update_brief_overview_missing_package(ctx):
+    result = await h.update_brief_overview(ctx, UpdateBriefOverviewParams(
+        package_id="nope", media_strategy="x",
+    ))
+    assert result.status == "error"
+    assert result.error_code == c.MEDIA_PACKAGE_NOT_FOUND

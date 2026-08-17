@@ -311,7 +311,7 @@ async def test_every_back_close_cancel_button_clears_package_id_explicitly(ctx_w
         return calls
 
     existing = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
-    new_brief = panels._editor_new(ctx_with_key, any_connected=True)
+    new_brief = await panels._editor_new(ctx_with_key, any_connected=True)
     settings = panels._settings_view(ctx_with_key, [], [], [])
 
     all_calls = _back_calls(existing) + _back_calls(new_brief) + _back_calls(settings)
@@ -481,3 +481,136 @@ async def test_project_scoped_center_view_looks_like_the_normal_catalog(ctx_with
     assert "New brief" in rendered
     assert "'searchable': True" in rendered
     assert "Heat recovery guide" in rendered
+
+
+# ── Project Overview tab ("О проекте", default style_direction, default lang) ─
+
+@pytest.mark.asyncio
+async def test_project_scoped_view_has_project_overview_tab_first(ctx_with_key, monkeypatch):
+    async def fake_packages(_ctx, *, limit, site=""):
+        return []
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels.studio_panel(ctx_with_key, site="klimtech.md")
+    rendered = repr(node)
+    assert "Project Overview" in rendered
+    assert "Briefs" in rendered
+    # Project Overview must be the FIRST tab.
+    assert rendered.index("Project Overview") < rendered.index("'Briefs'")
+
+
+@pytest.mark.asyncio
+async def test_project_overview_tab_shows_about_and_defaults(ctx_with_key, monkeypatch):
+    import handlers
+    from models import CreateProjectParams, UpdateProjectParams
+
+    await handlers.create_project(ctx_with_key, CreateProjectParams(site_id="klimtech.md", name="KlimTech"))
+    await handlers.update_project(ctx_with_key, UpdateProjectParams(
+        site_id="klimtech.md",
+        about="HVAC company in Moldova.",
+        default_style_direction="industrial, no text",
+        default_lang="ro",
+    ))
+
+    async def fake_packages(_ctx, *, limit, site=""):
+        return []
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels.studio_panel(ctx_with_key, site="klimtech.md")
+    rendered = repr(node)
+    assert "HVAC company in Moldova." in rendered
+    assert "industrial, no text" in rendered
+    assert "ro" in rendered
+
+
+@pytest.mark.asyncio
+async def test_unscoped_catalog_has_no_project_overview_tab(ctx_with_key, monkeypatch):
+    """No site selected -- 'every brief' -- there is no single project to
+    show an overview for, so no Tabs wrapper, same as before."""
+    async def fake_packages(_ctx, *, limit, site=""):
+        return []
+
+    monkeypatch.setattr(panels.st, "list_packages", fake_packages)
+    node = await panels.studio_panel(ctx_with_key)
+    rendered = repr(node)
+    assert "Project Overview" not in rendered
+
+
+# ── Brief Overview tab ("О брифе" / media strategy) ──────────────────────────
+
+@pytest.mark.asyncio
+async def test_existing_brief_has_brief_overview_tab_first(ctx_with_key, monkeypatch):
+    async def fake_package(_ctx, _package_id):
+        return {
+            "id": "brief-1", "article_title": "Heat recovery guide",
+            "site": "example.com", "status": "draft", "assets": [],
+            "media_strategy": "",
+        }
+
+    monkeypatch.setattr(panels.st, "get_package", fake_package)
+    node = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
+    rendered = repr(node)
+    assert "Brief Overview" in rendered
+    assert "Assets" in rendered
+    assert rendered.index("Brief Overview") < rendered.index("'Assets'")
+
+
+@pytest.mark.asyncio
+async def test_brief_overview_tab_shows_existing_media_strategy(ctx_with_key, monkeypatch):
+    async def fake_package(_ctx, _package_id):
+        return {
+            "id": "brief-1", "article_title": "Heat recovery guide",
+            "site": "example.com", "status": "draft", "assets": [],
+            "media_strategy": "Featured image shows the unit outdoors.",
+        }
+
+    monkeypatch.setattr(panels.st, "get_package", fake_package)
+    node = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
+    rendered = repr(node)
+    assert "Featured image shows the unit outdoors." in rendered
+
+
+@pytest.mark.asyncio
+async def test_existing_brief_assets_tab_still_has_generate_and_close(ctx_with_key, monkeypatch):
+    """The previously top-level Generate all / Close actions and asset grid
+    must still exist, just inside the second ('Assets') tab now."""
+    async def fake_package(_ctx, _package_id):
+        return {
+            "id": "brief-1", "article_title": "Heat recovery guide",
+            "site": "example.com", "status": "draft", "assets": [],
+            "media_strategy": "",
+        }
+
+    monkeypatch.setattr(panels.st, "get_package", fake_package)
+    node = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
+    rendered = repr(node)
+    assert "Generate all" in rendered
+    assert "'Close'" in rendered or "Close" in rendered
+
+
+@pytest.mark.asyncio
+async def test_new_brief_form_prefills_project_defaults(ctx_with_key):
+    """The Project Overview tab's saved defaults are not just stored text --
+    they actually pre-fill the New brief form's own style_direction/lang
+    fields for that project, while remaining fully editable/overridable."""
+    import handlers
+    from models import CreateProjectParams, UpdateProjectParams
+
+    await handlers.create_project(ctx_with_key, CreateProjectParams(site_id="klimtech.md", name="KlimTech"))
+    await handlers.update_project(ctx_with_key, UpdateProjectParams(
+        site_id="klimtech.md",
+        default_style_direction="industrial, no text, blue palette",
+        default_lang="ro",
+    ))
+
+    node = await panels.studio_panel(ctx_with_key, view="editor", package_id="new", site="klimtech.md")
+    rendered = repr(node)
+    assert "industrial, no text, blue palette" in rendered
+    assert "'value': 'ro'" in rendered
+
+
+@pytest.mark.asyncio
+async def test_new_brief_form_has_no_defaults_when_project_never_set_any(ctx_with_key):
+    node = await panels.studio_panel(ctx_with_key, view="editor", package_id="new", site="brand-new-site.md")
+    rendered = repr(node)
+    assert "New media brief" in rendered

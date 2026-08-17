@@ -32,9 +32,48 @@ async def create_project(ctx, site_id: str, name: str = "") -> tuple[str, dict] 
     for doc in page.data:
         if doc.data.get("site_id") == site_id:
             return None
-    payload = {"site_id": site_id, "name": name or site_id, "created_at": _now()}
+    payload = {
+        "site_id": site_id, "name": name or site_id, "created_at": _now(),
+        "about": "", "default_style_direction": "", "default_lang": "",
+    }
     doc = await ctx.store.create(PROJECTS_COLLECTION, payload)
     return doc.id, dict(doc.data)
+
+
+async def get_project(ctx, site_id: str) -> dict | None:
+    """One project row by its site_id, or None if never explicitly
+    registered (a brief-only "implicit" project, same case list_projects
+    already handles by synthesizing a row -- this lookup just doesn't)."""
+    page = await ctx.store.query(PROJECTS_COLLECTION, limit=200)
+    for doc in page.data:
+        if doc.data.get("site_id") == site_id:
+            row = dict(doc.data)
+            row["id"] = doc.id
+            return row
+    return None
+
+
+async def update_project(ctx, site_id: str, patch: dict) -> dict | None:
+    """Update a project's own fields (about/default_style_direction/
+    default_lang/name). Auto-creates the project row first if it only
+    existed implicitly (a brief referencing this site_id but no explicit
+    create_project call yet) -- same as get_project's "implicit project"
+    case, but this one needs a real doc id to write to."""
+    page = await ctx.store.query(PROJECTS_COLLECTION, limit=200)
+    existing_doc = next((doc for doc in page.data if doc.data.get("site_id") == site_id), None)
+    if existing_doc is None:
+        payload = {
+            "site_id": site_id, "name": site_id, "created_at": _now(),
+            "about": "", "default_style_direction": "", "default_lang": "",
+        }
+        created = await ctx.store.create(PROJECTS_COLLECTION, payload)
+        doc_id, merged = created.id, dict(created.data)
+    else:
+        doc_id, merged = existing_doc.id, dict(existing_doc.data)
+    merged.update(patch)
+    await ctx.store.update(PROJECTS_COLLECTION, doc_id, merged)
+    merged["id"] = doc_id
+    return merged
 
 
 async def list_projects(ctx) -> list[dict]:
@@ -57,6 +96,9 @@ async def list_projects(ctx) -> list[dict]:
         by_site_id[site_id] = {
             "id": doc.id, "site_id": site_id,
             "name": doc.data.get("name") or site_id,
+            "about": doc.data.get("about", ""),
+            "default_style_direction": doc.data.get("default_style_direction", ""),
+            "default_lang": doc.data.get("default_lang", ""),
             "created_at": doc.data.get("created_at", ""),
         }
 
@@ -68,7 +110,11 @@ async def list_projects(ctx) -> list[dict]:
             continue
         counts[site_id] = counts.get(site_id, 0) + 1
         if site_id not in by_site_id:
-            by_site_id[site_id] = {"id": "", "site_id": site_id, "name": site_id, "created_at": ""}
+            by_site_id[site_id] = {
+                "id": "", "site_id": site_id, "name": site_id,
+                "about": "", "default_style_direction": "", "default_lang": "",
+                "created_at": "",
+            }
 
     rows = list(by_site_id.values())
     for row in rows:

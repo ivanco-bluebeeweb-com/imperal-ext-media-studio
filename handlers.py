@@ -56,6 +56,8 @@ from models import (
     RegenerateAssetParams,
     RecoverStoredImagesParams,
     UpdateAssetMetaParams,
+    UpdateBriefOverviewParams,
+    UpdateProjectParams,
 )
 from shared import (
     ASPECT_RATIO_4_3,
@@ -324,6 +326,7 @@ def _package_to_entity(row: dict) -> MediaPackage:
         model=row.get("model", ""),
         lang=row.get("lang", ""),
         native_title=row.get("native_title", ""),
+        media_strategy=row.get("media_strategy", ""),
         assets=assets,
         created_at=row.get("created_at", ""),
         updated_at=row.get("updated_at", ""),
@@ -579,8 +582,64 @@ async def create_project(ctx, params: CreateProjectParams) -> ActionResult:
         return _error(f"A project for '{site_id}' already exists.", c.MEDIA_PROJECT_ALREADY_EXISTS)
     _project_id, data = created
     entity = Project(id=_project_id, title=data["name"], site_id=data["site_id"],
-                      name=data["name"], brief_count=0, created_at=data.get("created_at", ""))
+                      name=data["name"], about=data.get("about", ""),
+                      default_style_direction=data.get("default_style_direction", ""),
+                      default_lang=data.get("default_lang", ""),
+                      brief_count=0, created_at=data.get("created_at", ""))
     return ActionResult.success(entity, f"Project '{data['name']}' created.")
+
+
+@chat.function(
+    "update_project",
+    "Update a project's own overview fields: \"О проекте\" (free-text "
+    "description), the default style_direction pre-filled into every new "
+    "brief for this project, and the default lang pre-filled the same way.",
+    action_type="write",
+    data_model=Project,
+    event="media-studio.update_project",
+    effects=["update:project"],
+)
+async def update_project(ctx, params: UpdateProjectParams) -> ActionResult:
+    """Update about/default_style_direction/default_lang for one project."""
+    site_id = params.site_id.strip()
+    if not site_id:
+        return _error("site_id is required.", c.MEDIA_PROJECT_VALIDATION_FAILED)
+    patch = {
+        "about": params.about.strip(),
+        "default_style_direction": params.default_style_direction.strip(),
+        "default_lang": params.default_lang.strip(),
+    }
+    data = await st.update_project(ctx, site_id, patch)
+    entity = Project(id=data.get("id", ""), title=data.get("name", site_id),
+                      site_id=data["site_id"], name=data.get("name", site_id),
+                      about=data.get("about", ""),
+                      default_style_direction=data.get("default_style_direction", ""),
+                      default_lang=data.get("default_lang", ""),
+                      brief_count=0, created_at=data.get("created_at", ""))
+    return ActionResult.success(entity, f"Project '{entity.name}' overview updated.")
+
+
+@chat.function(
+    "update_brief_overview",
+    "Update a media brief's \"О брифе\" field -- the media strategy for this "
+    "one content unit: why these images, what they must communicate, and how "
+    "they support the article. Does not touch the brief's summary, style, or "
+    "any generated asset.",
+    action_type="write",
+    data_model=MediaPackage,
+    event="media-studio.update_brief_overview",
+    effects=["update:media_package"],
+)
+async def update_brief_overview(ctx, params: UpdateBriefOverviewParams) -> ActionResult:
+    """Update only media_strategy on a package, leaving everything else untouched."""
+    row = await st.get_package(ctx, params.package_id)
+    if row is None:
+        return _error(
+            f"No media package found with id '{params.package_id}'.",
+            c.MEDIA_PACKAGE_NOT_FOUND,
+        )
+    updated = await st.update_package(ctx, params.package_id, {"media_strategy": params.media_strategy.strip()})
+    return ActionResult.success(_package_to_entity(updated), "Brief overview updated.")
 
 
 @ext.expose("register_project", action_type="write")
