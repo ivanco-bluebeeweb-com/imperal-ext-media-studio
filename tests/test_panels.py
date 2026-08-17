@@ -589,6 +589,31 @@ async def test_existing_brief_assets_tab_still_has_generate_and_close(ctx_with_k
 
 
 @pytest.mark.asyncio
+async def test_existing_brief_with_assets_renders_asset_cards_without_error(ctx_with_key, monkeypatch):
+    """Regression: a NON-EMPTY assets list must actually reach _asset_card
+    without a TypeError. An empty-assets fixture (as used above) never
+    exercises that call at all -- it stayed green while a real brief with
+    real assets hung the panel with a server-side TypeError (extra
+    positional arg passed to _asset_card during the Tabs refactor)."""
+    async def fake_package(_ctx, _package_id):
+        return {
+            "id": "brief-1", "article_title": "Heat recovery guide",
+            "site": "example.com", "status": "ready", "media_strategy": "",
+            "assets": [{
+                "id": "featured", "role": "featured", "title": "Featured image",
+                "status": "ready", "image_url": "/storage/x", "prompt": "a heat pump",
+                "alt_text": "x", "caption": "x", "filename": "f",
+            }],
+        }
+
+    monkeypatch.setattr(panels.st, "get_package", fake_package)
+    node = await panels._editor_existing(ctx_with_key, "brief-1", any_connected=True)
+    rendered = repr(node)
+    assert "Featured Image" in rendered
+    assert "a heat pump" in rendered
+
+
+@pytest.mark.asyncio
 async def test_new_brief_form_prefills_project_defaults(ctx_with_key):
     """The Project Overview tab's saved defaults are not just stored text --
     they actually pre-fill the New brief form's own style_direction/lang

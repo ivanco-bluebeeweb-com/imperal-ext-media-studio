@@ -617,7 +617,7 @@ def _brief_assets_tab(package_id: str, row: dict, any_connected: bool) -> ui.UIN
         ))
     children.append(actions)
     children.append(ui.Grid(children=[
-        _asset_card(package_id, row.get("site", ""), a) for a in assets
+        _asset_card(package_id, a) for a in assets
     ], columns=2, gap=4))
 
     return ui.Stack(children=children, gap=4)
