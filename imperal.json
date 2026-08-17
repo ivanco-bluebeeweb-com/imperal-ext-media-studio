@@ -384,6 +384,11 @@
             "title": "Native Title",
             "type": "string"
           },
+          "media_strategy": {
+            "default": "",
+            "title": "Media Strategy",
+            "type": "string"
+          },
           "assets": {
             "items": {
               "$ref": "#/$defs/MediaAsset"
@@ -731,6 +736,11 @@
             "title": "Native Title",
             "type": "string"
           },
+          "media_strategy": {
+            "default": "",
+            "title": "Media Strategy",
+            "type": "string"
+          },
           "assets": {
             "items": {
               "$ref": "#/$defs/MediaAsset"
@@ -873,6 +883,21 @@
             "title": "Name",
             "type": "string"
           },
+          "about": {
+            "default": "",
+            "title": "About",
+            "type": "string"
+          },
+          "default_style_direction": {
+            "default": "",
+            "title": "Default Style Direction",
+            "type": "string"
+          },
+          "default_lang": {
+            "default": "",
+            "title": "Default Lang",
+            "type": "string"
+          },
           "brief_count": {
             "default": 0,
             "title": "Brief Count",
@@ -893,6 +918,528 @@
         "x-sdl": "entity"
       },
       "event": "media-studio.create_project",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "update_project",
+      "description": "Update a project's own overview fields: \"О проекте\" (free-text description), the default style_direction pre-filled into every new brief for this project, and the default lang pre-filled the same way.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:project"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "site_id": {
+            "description": "The project's site_id, from list_projects.",
+            "title": "Site Id",
+            "type": "string"
+          },
+          "about": {
+            "default": "",
+            "description": "\"О проекте\" -- free text describing what this site/brand is, its audience, and any notes useful to whoever works this project. Empty string clears it; omit the field entirely (don't pass it) to leave unchanged -- but since this is a plain string param, pass the CURRENT value back if you don't want to change it.",
+            "title": "About",
+            "type": "string"
+          },
+          "default_style_direction": {
+            "default": "",
+            "description": "Default style_direction pre-filled into every NEW brief created for this project (e.g. 'industrial, realistic, no text, blue/grey palette'). A brief can still override it.",
+            "title": "Default Style Direction",
+            "type": "string"
+          },
+          "default_lang": {
+            "default": "",
+            "description": "Default lang pre-filled into every NEW brief created for this project, e.g. 'ru', 'ro'.",
+            "title": "Default Lang",
+            "type": "string"
+          }
+        },
+        "required": [
+          "site_id"
+        ],
+        "title": "UpdateProjectParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One project = one connected site we make media briefs for.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site_id": {
+            "default": "",
+            "title": "Site Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "about": {
+            "default": "",
+            "title": "About",
+            "type": "string"
+          },
+          "default_style_direction": {
+            "default": "",
+            "title": "Default Style Direction",
+            "type": "string"
+          },
+          "default_lang": {
+            "default": "",
+            "title": "Default Lang",
+            "type": "string"
+          },
+          "brief_count": {
+            "default": 0,
+            "title": "Brief Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "Project",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.update_project",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "update_brief_overview",
+      "description": "Update a media brief's \"О брифе\" field -- the media strategy for this one content unit: why these images, what they must communicate, and how they support the article. Does not touch the brief's summary, style, or any generated asset.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:media_package"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "package_id": {
+            "description": "The media package id, from list_media_packages.",
+            "title": "Package Id",
+            "type": "string"
+          },
+          "media_strategy": {
+            "default": "",
+            "description": "\"О брифе\" -- the media strategy for this content unit: why these specific images, what each must visually communicate, how they support the article's angle and the reader's journey through it. Free text.",
+            "title": "Media Strategy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "package_id"
+        ],
+        "title": "UpdateBriefOverviewParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MediaAsset": {
+            "description": "One image within a package -- featured or one of the inline slots.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "default": "",
+                "title": "Status",
+                "type": "string"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "role": {
+                "default": "",
+                "title": "Role",
+                "type": "string"
+              },
+              "image_text": {
+                "default": "",
+                "title": "Image Text",
+                "type": "string"
+              },
+              "provider": {
+                "default": "",
+                "title": "Provider",
+                "type": "string"
+              },
+              "provider_task_id": {
+                "default": "",
+                "title": "Provider Task Id",
+                "type": "string"
+              },
+              "model": {
+                "default": "",
+                "title": "Model",
+                "type": "string"
+              },
+              "image_url": {
+                "default": "",
+                "title": "Image Url",
+                "type": "string"
+              },
+              "original_image_url": {
+                "default": "",
+                "title": "Original Image Url",
+                "type": "string"
+              },
+              "original_storage_path": {
+                "default": "",
+                "title": "Original Storage Path",
+                "type": "string"
+              },
+              "original_dimensions": {
+                "default": "",
+                "title": "Original Dimensions",
+                "type": "string"
+              },
+              "original_format": {
+                "default": "",
+                "title": "Original Format",
+                "type": "string"
+              },
+              "original_file_size": {
+                "default": "",
+                "title": "Original File Size",
+                "type": "string"
+              },
+              "upscaled_image_url": {
+                "default": "",
+                "title": "Upscaled Image Url",
+                "type": "string"
+              },
+              "upscaled_storage_path": {
+                "default": "",
+                "title": "Upscaled Storage Path",
+                "type": "string"
+              },
+              "upscaled_dimensions": {
+                "default": "",
+                "title": "Upscaled Dimensions",
+                "type": "string"
+              },
+              "upscaled_format": {
+                "default": "",
+                "title": "Upscaled Format",
+                "type": "string"
+              },
+              "upscaled_file_size": {
+                "default": "",
+                "title": "Upscaled File Size",
+                "type": "string"
+              },
+              "filename": {
+                "default": "",
+                "title": "Filename",
+                "type": "string"
+              },
+              "prompt": {
+                "default": "",
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_text": {
+                "default": "",
+                "title": "Alt Text",
+                "type": "string"
+              },
+              "caption": {
+                "default": "",
+                "title": "Caption",
+                "type": "string"
+              },
+              "error_message": {
+                "default": "",
+                "title": "Error Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "MediaAsset",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "A brief plus its generated (or in-progress) image assets.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "site": {
+            "default": "",
+            "title": "Site",
+            "type": "string"
+          },
+          "article_title": {
+            "default": "",
+            "title": "Article Title",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "style_direction": {
+            "default": "",
+            "title": "Style Direction",
+            "type": "string"
+          },
+          "text_policy": {
+            "default": "no_text",
+            "title": "Text Policy",
+            "type": "string"
+          },
+          "image_text": {
+            "default": "",
+            "title": "Image Text",
+            "type": "string"
+          },
+          "inline_count": {
+            "default": 0,
+            "title": "Inline Count",
+            "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "lang": {
+            "default": "",
+            "title": "Lang",
+            "type": "string"
+          },
+          "native_title": {
+            "default": "",
+            "title": "Native Title",
+            "type": "string"
+          },
+          "media_strategy": {
+            "default": "",
+            "title": "Media Strategy",
+            "type": "string"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/$defs/MediaAsset"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MediaPackage",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.update_brief_overview",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -1222,6 +1769,11 @@
           "native_title": {
             "default": "",
             "title": "Native Title",
+            "type": "string"
+          },
+          "media_strategy": {
+            "default": "",
+            "title": "Media Strategy",
             "type": "string"
           },
           "assets": {
@@ -1567,6 +2119,11 @@
           "native_title": {
             "default": "",
             "title": "Native Title",
+            "type": "string"
+          },
+          "media_strategy": {
+            "default": "",
+            "title": "Media Strategy",
             "type": "string"
           },
           "assets": {
@@ -2348,6 +2905,11 @@
           "native_title": {
             "default": "",
             "title": "Native Title",
+            "type": "string"
+          },
+          "media_strategy": {
+            "default": "",
+            "title": "Media Strategy",
             "type": "string"
           },
           "assets": {
@@ -3840,6 +4402,287 @@
         "x-sdl": "entity"
       },
       "event": "media-studio.list_prompt_engine_log",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "get_prompt_engine_config",
+      "description": "Read the Image Prompt engine's current editable settings (generic lighting/camera/style fallback clauses and the review alert threshold) -- what App settings > Image Prompt engine shows.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "description": "No inputs -- always checks the same 3 vendor guide sources against\ntheir last-known hashes, and re-scores a sample of this app's own\nrecently generated prompts.",
+        "properties": {},
+        "title": "CheckPromptEngineUpdatesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "The Image Prompt engine's current editable settings -- read by the\nApp settings > Image Prompt engine tab to pre-fill its form.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "generic_lighting": {
+            "default": "",
+            "title": "Generic Lighting",
+            "type": "string"
+          },
+          "generic_camera_featured": {
+            "default": "",
+            "title": "Generic Camera Featured",
+            "type": "string"
+          },
+          "generic_camera_inline": {
+            "default": "",
+            "title": "Generic Camera Inline",
+            "type": "string"
+          },
+          "generic_style": {
+            "default": "",
+            "title": "Generic Style",
+            "type": "string"
+          },
+          "score_alert_threshold": {
+            "default": 0,
+            "title": "Score Alert Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PromptEngineConfig",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.get_prompt_engine_config",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "media-studio"
+    },
+    {
+      "name": "save_prompt_engine_config",
+      "description": "Apply edited Image Prompt engine settings from the App settings > Image Prompt engine tab: the generic lighting/camera/style fallback clauses this engine appends when a prompt is missing them, and the review alert threshold. A blank field keeps its current value -- nothing is ever blanked out by omission. Takes effect immediately, on the very next brief/fix/review, no redeploy needed.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "media-studio.prompt_engine_config.updated"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Every field is optional and free text/number -- a blank text field\nmeans 'keep the current value' (see prompt_engine.save_prompt_config),\nso the App settings form can submit all fields every time without\naccidentally blanking out ones the user didn't touch.",
+        "properties": {
+          "generic_lighting": {
+            "default": "",
+            "description": "Lighting clause auto-appended when a prompt is missing lighting language.",
+            "title": "Generic Lighting",
+            "type": "string"
+          },
+          "generic_camera_featured": {
+            "default": "",
+            "description": "Camera/lens clause auto-appended to FEATURED role prompts missing one.",
+            "title": "Generic Camera Featured",
+            "type": "string"
+          },
+          "generic_camera_inline": {
+            "default": "",
+            "description": "Camera/lens clause auto-appended to INLINE role prompts missing one.",
+            "title": "Generic Camera Inline",
+            "type": "string"
+          },
+          "generic_style": {
+            "default": "",
+            "description": "Generic style fallback appended when a prompt names no style/medium at all.",
+            "title": "Generic Style",
+            "type": "string"
+          },
+          "score_alert_threshold": {
+            "default": "",
+            "description": "Below this average rubric score (0-100), the monthly self-review flags 'review recommended'. Leave blank to keep the current value.",
+            "title": "Score Alert Threshold",
+            "type": "string"
+          }
+        },
+        "title": "SavePromptEngineConfigParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "The Image Prompt engine's current editable settings -- read by the\nApp settings > Image Prompt engine tab to pre-fill its form.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "generic_lighting": {
+            "default": "",
+            "title": "Generic Lighting",
+            "type": "string"
+          },
+          "generic_camera_featured": {
+            "default": "",
+            "title": "Generic Camera Featured",
+            "type": "string"
+          },
+          "generic_camera_inline": {
+            "default": "",
+            "title": "Generic Camera Inline",
+            "type": "string"
+          },
+          "generic_style": {
+            "default": "",
+            "title": "Generic Style",
+            "type": "string"
+          },
+          "score_alert_threshold": {
+            "default": 0,
+            "title": "Score Alert Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PromptEngineConfig",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "media-studio.save_prompt_engine_config",
       "background": false,
       "long_running": false,
       "scopes": [],
