@@ -161,6 +161,7 @@ def text_policy_clause(role: str, text_policy: str, image_text: str = "") -> str
 def prompt_for_role(
     role: str, article_title: str, summary: str, style_direction: str, lang: str = "",
     text_policy: str = TEXT_POLICY_NO_TEXT, image_text: str = "",
+    visual_subject: str = "", visual_environment: str = "",
 ) -> str:
     """Build an image-generation prompt for one asset role.
 
@@ -169,6 +170,19 @@ def prompt_for_role(
     up as N near-identical images. The prompt text itself always stays
     English (Mystic/Imagen4/Gemini are documented and tuned for English
     input -- see contains_non_english_text's gate at brief-creation time).
+
+    `visual_subject`/`visual_environment` are the two slots a caller (e.g.
+    Content Strategy Hub's build_media_brief_handoff) can pass to describe
+    the actual SUBJECT+ACTION and ENVIRONMENT/CONTEXT of the shot -- the two
+    slots most keyword-summary/title text never really covers (a SEO title
+    like "Cost of installing a heat-recovery ventilator" names a topic, not
+    a scene). When given, `visual_subject` REPLACES the summary/title as the
+    base sentence (it's the more specific, purpose-built description) and
+    `visual_environment` is appended as its own explicit clause so the scene
+    is never left for the model to invent. Neither is fabricated here if
+    omitted -- see `prompt_engine.generate_prompt`'s deterministic, clearly-
+    generic environment fallback for the case where a caller gives nothing
+    at all.
 
     `lang` is the ARTICLE's own language (e.g. 'ru', 'ro'), not the prompt's
     language. When given, an explicit clause is appended instructing that
@@ -184,7 +198,13 @@ def prompt_for_role(
     `image_text` must carry the actual words to render; the clause always
     states either "no text" or the exact text, never a vague "maybe".
     """
-    base = summary.strip() or article_title.strip() or "a professional editorial photo"
+    base = (
+        visual_subject.strip() or summary.strip() or article_title.strip()
+        or "a professional editorial photo"
+    )
+    environment = (
+        f" Environment: {visual_environment.strip()}." if visual_environment.strip() else ""
+    )
     style = f" Style: {style_direction.strip()}." if style_direction.strip() else ""
     text_clause = text_policy_clause(role, text_policy, image_text)
     if role == "featured":
@@ -199,7 +219,7 @@ def prompt_for_role(
         f"language) -- never in English or any other language."
         if lang_name else ""
     )
-    return f"{base}. {framing}{style}{lang_clause}".strip()
+    return f"{base}. {framing}{environment}{style}{lang_clause}".strip()
 
 
 def is_absolute_public_url(url: str) -> bool:

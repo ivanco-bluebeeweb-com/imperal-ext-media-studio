@@ -276,6 +276,22 @@ def _settings_view(
             action="save_prompt_engine_config",
             submit_label="Apply Changes",
             children=[
+                ui.Toggle(
+                    label="Forbid text in generated images",
+                    param_name="forbid_image_text",
+                    value=bool(prompt_config.get("forbid_image_text", True)),
+                ),
+                ui.Text(
+                    "On by default: every generated image is required to be "
+                    "clean, with no legible labels, signage, or captions "
+                    "baked in. Turn this off only for a brief where "
+                    "rendering exact in-image text is genuinely the right "
+                    "call -- the brief must still supply the exact wording "
+                    "itself (image_text); this switch only lifts the "
+                    "blanket ban, it never invents text on its own.",
+                    variant="caption",
+                ),
+                ui.Divider(),
                 ui.Text("Generic lighting clause", variant="label"),
                 ui.TextArea(
                     param_name="generic_lighting",

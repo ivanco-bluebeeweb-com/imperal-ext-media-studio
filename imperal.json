@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.19",
   "app_id": "media-studio",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Media Hub",
   "description": "Turn an article brief into a ready-to-publish image package -- featured image plus inline supporting images, with alt text -- using your own Magnific API key. Supports multiple AI image models (Magnific Mystic, Google Nano Banana Pro/Flash, Google Gemini 2.5 Flash, Flux, Seedream and more) plus an automatic 'auto' model picker that matches the model to the image's role and prompt. Google Imagen 4 Ultra/Fast are excluded from selection.",
   "icon": "icon.svg",
@@ -84,6 +84,18 @@
             "default": "",
             "description": "The article title written in the post's OWN language (lang) -- used ONLY to build default alt text/caption. Keep 'article_title' itself in English (it feeds the image prompt, which must stay English); pass the real, native-language title here so alt text/caption come out correct for the post instead of defaulting to English. Omit to fall back to article_title (English default, same as v1 behaviour).",
             "title": "Native Title",
+            "type": "string"
+          },
+          "visual_subject": {
+            "default": "",
+            "description": "What is physically IN the shot and what it's doing -- e.g. 'a certified technician inspecting an installed heat-recovery ventilator unit'. A SEO article_title names a TOPIC, not a scene, so pass this whenever the caller has a real, non-generic visual description (e.g. Content Strategy Hub deriving it from the brief's own primary_query + resolved_category). Never invented here if omitted -- the prompt engine falls back to article_title/summary, same as before this field existed.",
+            "title": "Visual Subject",
+            "type": "string"
+          },
+          "visual_environment": {
+            "default": "",
+            "description": "Where the shot is set -- e.g. 'a modern residential living room with large windows'. Pass this whenever the caller has a real scene/setting description (e.g. from an approved Visual Profile's visual_intent). If omitted, this is NEVER left blank in the final prompt: the engine always appends an honestly-generic environment fallback so the Environment/Context slot is guaranteed filled either way.",
+            "title": "Visual Environment",
             "type": "string"
           }
         },
@@ -925,7 +937,7 @@
     },
     {
       "name": "update_project",
-      "description": "Update a project's own overview fields: \"О проекте\" (free-text description), the default style_direction pre-filled into every new brief for this project, and the default lang pre-filled the same way.",
+      "description": "Update a project's own overview fields: \"\u041e \u043f\u0440\u043e\u0435\u043a\u0442\u0435\" (free-text description), the default style_direction pre-filled into every new brief for this project, and the default lang pre-filled the same way.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -941,7 +953,7 @@
           },
           "about": {
             "default": "",
-            "description": "\"О проекте\" -- free text describing what this site/brand is, its audience, and any notes useful to whoever works this project. Empty string clears it; omit the field entirely (don't pass it) to leave unchanged -- but since this is a plain string param, pass the CURRENT value back if you don't want to change it.",
+            "description": "\"\u041e \u043f\u0440\u043e\u0435\u043a\u0442\u0435\" -- free text describing what this site/brand is, its audience, and any notes useful to whoever works this project. Empty string clears it; omit the field entirely (don't pass it) to leave unchanged -- but since this is a plain string param, pass the CURRENT value back if you don't want to change it.",
             "title": "About",
             "type": "string"
           },
@@ -1087,7 +1099,7 @@
     },
     {
       "name": "update_brief_overview",
-      "description": "Update a media brief's \"О брифе\" field -- the media strategy for this one content unit: why these images, what they must communicate, and how they support the article. Does not touch the brief's summary, style, or any generated asset.",
+      "description": "Update a media brief's \"\u041e \u0431\u0440\u0438\u0444\u0435\" field -- the media strategy for this one content unit: why these images, what they must communicate, and how they support the article. Does not touch the brief's summary, style, or any generated asset.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -1103,7 +1115,7 @@
           },
           "media_strategy": {
             "default": "",
-            "description": "\"О брифе\" -- the media strategy for this content unit: why these specific images, what each must visually communicate, how they support the article's angle and the reader's journey through it. Free text.",
+            "description": "\"\u041e \u0431\u0440\u0438\u0444\u0435\" -- the media strategy for this content unit: why these specific images, what each must visually communicate, how they support the article's angle and the reader's journey through it. Free text.",
             "title": "Media Strategy",
             "type": "string"
           }
@@ -2947,7 +2959,7 @@
     {
       "name": "delete_asset_image",
       "description": "Delete one stored image version from a media package. Choose original or upscaled; the other version and its metadata stay intact.",
-      "action_type": "write",
+      "action_type": "destructive",
       "chain_callable": true,
       "effects": [
         "update:media_package"
@@ -3399,7 +3411,7 @@
     {
       "name": "delete_media_package",
       "description": "Permanently delete a media package and all of its asset records. Does not delete images already hosted on Magnific's own servers -- only the package record inside Media Hub.",
-      "action_type": "write",
+      "action_type": "destructive",
       "chain_callable": true,
       "effects": [
         "delete:media_package"

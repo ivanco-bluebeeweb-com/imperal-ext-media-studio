@@ -100,7 +100,29 @@ async def test_create_media_brief_default_text_policy_forbids_in_image_text(ctx)
 
 
 @pytest.mark.asyncio
-async def test_create_media_brief_allow_text_policy_renders_the_exact_words(ctx):
+async def test_create_media_brief_allow_text_is_overridden_by_the_default_ban(ctx):
+    """Standing directive (2026-08-18): the text ban is ON by default, so an
+    explicit allow_text request is silently forced back to no_text unless a
+    human has switched the App settings toggle off first -- see the next
+    test for that opt-out path."""
+    result = await h.create_media_brief(
+        ctx, CreateMediaBriefParams(
+            site="g4s.md", article_title="Price comparison", summary="A guide",
+            inline_count=0, text_policy="allow_text", image_text="From $49/month",
+        ),
+    )
+    assert result.status == "success"
+    assert result.data.text_policy == "no_text"
+    assert "From $49/month" not in result.data.assets[0].prompt
+    assert "no embedded text" in result.data.assets[0].prompt
+
+
+@pytest.mark.asyncio
+async def test_create_media_brief_allow_text_policy_renders_the_exact_words_when_ban_off(ctx):
+    """With the settings toggle explicitly off, allow_text works exactly as
+    before -- proving the ban is real but genuinely switchable."""
+    import prompt_engine as pe
+    await pe.save_prompt_config(ctx, {"forbid_image_text": False})
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(
             site="g4s.md", article_title="Price comparison", summary="A guide",
@@ -115,6 +137,8 @@ async def test_create_media_brief_allow_text_policy_renders_the_exact_words(ctx)
 
 @pytest.mark.asyncio
 async def test_create_media_brief_allow_text_without_image_text_is_rejected(ctx):
+    import prompt_engine as pe
+    await pe.save_prompt_config(ctx, {"forbid_image_text": False})
     result = await h.create_media_brief(
         ctx, CreateMediaBriefParams(
             site="g4s.md", article_title="Price comparison", summary="A guide",
@@ -514,6 +538,10 @@ async def test_delete_asset_image_keeps_the_other_version(ctx):
 
 @pytest.mark.asyncio
 async def test_update_asset_meta_edits_all_pipeline_metadata(ctx):
+    """Standing directive (2026-08-18): update_asset_meta writes straight
+    into the asset's stored prompt, so -- like regenerate_asset's
+    prompt_override -- the system-wide no-text ban (on by default) is
+    enforced here too by appending the same clean-composition clause."""
     brief = await h.create_media_brief(ctx, CreateMediaBriefParams(article_title="T", inline_count=0))
     result = await h.update_asset_meta(ctx, UpdateAssetMetaParams(
         package_id=brief.data.id,
@@ -523,15 +551,19 @@ async def test_update_asset_meta_edits_all_pipeline_metadata(ctx):
         alt_text="new alt",
         caption="new caption",
     ))
+    expected_prompt = (
+        "A modern heat pump beside a bright house. "
+        "clean composition, no embedded text or logos."
+    )
     assert result.status == "success"
     assert result.data.filename == "heat-pump-featured"
-    assert result.data.prompt == "A modern heat pump beside a bright house."
+    assert result.data.prompt == expected_prompt
     assert result.data.alt_text == "new alt"
     assert result.data.caption == "new caption"
     stored = await h.st.get_package(ctx, brief.data.id)
     asset = stored["assets"][0]
     assert asset["filename"] == "heat-pump-featured"
-    assert asset["prompt"] == "A modern heat pump beside a bright house."
+    assert asset["prompt"] == expected_prompt
 
 
 @pytest.mark.asyncio

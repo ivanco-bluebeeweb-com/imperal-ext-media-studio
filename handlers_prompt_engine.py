@@ -190,8 +190,9 @@ async def media_prompt_engine_review(ctx) -> None:
 @chat.function(
     "get_prompt_engine_config",
     "Read the Image Prompt engine's current editable settings (generic "
-    "lighting/camera/style fallback clauses and the review alert "
-    "threshold) -- what App settings > Image Prompt engine shows.",
+    "lighting/camera/style fallback clauses, the review alert threshold, "
+    "and whether in-image text is banned) -- what App settings > Image "
+    "Prompt engine shows.",
     action_type="read",
     data_model=PromptEngineConfig,
     event="media-studio.get_prompt_engine_config",
@@ -206,6 +207,7 @@ async def get_prompt_engine_config(ctx, params: CheckPromptEngineUpdatesParams) 
         generic_camera_inline=config["generic_camera_inline"],
         generic_style=config["generic_style"],
         score_alert_threshold=int(config["score_alert_threshold"]),
+        forbid_image_text=bool(config.get("forbid_image_text", True)),
     )
     return ActionResult.success(entity, "Current Image Prompt engine settings.")
 
@@ -214,10 +216,11 @@ async def get_prompt_engine_config(ctx, params: CheckPromptEngineUpdatesParams) 
     "save_prompt_engine_config",
     "Apply edited Image Prompt engine settings from the App settings > "
     "Image Prompt engine tab: the generic lighting/camera/style fallback "
-    "clauses this engine appends when a prompt is missing them, and the "
-    "review alert threshold. A blank field keeps its current value -- "
-    "nothing is ever blanked out by omission. Takes effect immediately, "
-    "on the very next brief/fix/review, no redeploy needed.",
+    "clauses this engine appends when a prompt is missing them, the "
+    "review alert threshold, and whether in-image text is banned. A blank "
+    "text field keeps its current value -- nothing is ever blanked out by "
+    "omission. Takes effect immediately, on the very next brief/fix/review, "
+    "no redeploy needed.",
     action_type="write",
     chain_callable=True,
     data_model=PromptEngineConfig,
@@ -233,6 +236,7 @@ async def save_prompt_engine_config(
         "generic_camera_featured": params.generic_camera_featured.strip(),
         "generic_camera_inline": params.generic_camera_inline.strip(),
         "generic_style": params.generic_style.strip(),
+        "forbid_image_text": bool(params.forbid_image_text),
     }
     threshold_raw = params.score_alert_threshold.strip()
     if threshold_raw:
@@ -259,5 +263,6 @@ async def save_prompt_engine_config(
         generic_camera_inline=config["generic_camera_inline"],
         generic_style=config["generic_style"],
         score_alert_threshold=int(config["score_alert_threshold"]),
+        forbid_image_text=bool(config.get("forbid_image_text", True)),
     )
     return ActionResult.success(entity, "Image Prompt engine settings applied.")

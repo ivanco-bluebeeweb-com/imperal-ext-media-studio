@@ -124,10 +124,16 @@ def test_fix_prompt_featured_vs_inline_use_different_camera_clauses():
     assert fixed_featured != fixed_inline
 
 
-def test_fix_prompt_empty_prompt_reports_unfixable_subject_and_environment():
-    _fixed, _additions, unfixable = pe.fix_prompt("", "featured")
+def test_fix_prompt_empty_prompt_reports_unfixable_subject_only():
+    # System-level guarantee (2026-08-18): environment is no longer left
+    # unfixable -- a generic, honestly-labelled fallback clause is always
+    # appended instead, exactly like lighting/camera/style already were.
+    # Subject stays genuinely unfixable: this engine will never invent one.
+    fixed, additions, unfixable = pe.fix_prompt("", "featured")
     assert "subject" in unfixable
-    assert "environment" in unfixable
+    assert "environment" not in unfixable
+    assert any("environment" in a.lower() for a in additions)
+    assert "clean, realistic, well-lit professional environment" in fixed
 
 
 # --------------------------- generate_prompt ---------------------------

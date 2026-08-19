@@ -366,7 +366,21 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
             c.MEDIA_INVALID_TEXT_POLICY,
         )
     image_text = params.image_text.strip()
-    if text_policy == TEXT_POLICY_ALLOW_TEXT and not image_text:
+
+    # Standing directive (2026-08-18): fetch the effective config BEFORE
+    # validating allow_text/image_text, so a request that the system-wide
+    # ban will override to no_text anyway is never spuriously rejected for
+    # "missing image_text" -- the ban already makes that combination moot.
+    # `generate_prompt` re-applies this same override per-asset below (the
+    # actual enforcement point); this pre-normalization keeps the stored
+    # package record (`text_policy`/`image_text`) honest about what was
+    # ACTUALLY generated, not what was merely requested.
+    prompt_config = await pe.get_prompt_config(ctx)
+    text_forbidden = prompt_config.get("forbid_image_text", True)
+    if text_forbidden:
+        text_policy = TEXT_POLICY_NO_TEXT
+        image_text = ""
+    elif text_policy == TEXT_POLICY_ALLOW_TEXT and not image_text:
         return _error(
             "text_policy='allow_text' needs the actual words to render -- "
             "pass them in image_text (e.g. a price, a short label, a one-line "
@@ -379,24 +393,27 @@ async def create_media_brief(ctx, params: CreateMediaBriefParams) -> ActionResul
 
     non_english = contains_non_english_text(
         params.article_title, params.summary, params.style_direction,
+        params.visual_subject, params.visual_environment,
     )
     if non_english:
         return _error(
             "Image prompts must be written in English -- Magnific Mystic is "
             f"tuned for English input. Found non-English text: '{non_english[:40]}'. "
-            "Translate article_title/summary/style_direction to English "
-            "before creating this brief (the article itself can stay in "
-            "any language -- only the image brief needs English).",
+            "Translate article_title/summary/style_direction/visual_subject/ "
+            "visual_environment to English before creating this brief (the "
+            "article itself can stay in any language -- only the image brief "
+            "needs English).",
             c.MEDIA_PROMPT_NOT_ENGLISH,
         )
 
-    prompt_config = await pe.get_prompt_config(ctx)
+    prompt_config = prompt_config or await pe.get_prompt_config(ctx)
     roles = roles_for(params.inline_count)
     assets = []
     for role in roles:
         prompt = pe.generate_prompt(
             role, params.article_title, params.summary, params.style_direction,
             params.lang.strip(), text_policy, image_text, prompt_config,
+            params.visual_subject.strip(), params.visual_environment.strip(),
         )
         resolved_model = _resolve_asset_model(
             role, model_choice, prompt, params.style_direction,
@@ -748,7 +765,19 @@ async def regenerate_asset(ctx, params: RegenerateAssetParams) -> ActionResult:
                 "English first.",
                 c.MEDIA_PROMPT_NOT_ENGLISH,
             )
-        target["prompt"] = params.prompt_override.strip()
+        override_prompt = params.prompt_override.strip()
+        # Standing directive (2026-08-18): `prompt_override` bypasses
+        # `generate_prompt` entirely (it writes straight into the asset's
+        # stored prompt), so it's the one path that could otherwise smuggle
+        # in-image text past the system-wide ban. When the ban is on
+        # (default), silently but visibly enforce it here too instead of
+        # trusting the override's own wording -- append the same no-text
+        # clause `shared.text_policy_clause` uses, so the ban holds
+        # regardless of entry point.
+        prompt_config = await pe.get_prompt_config(ctx)
+        if prompt_config.get("forbid_image_text", True):
+            override_prompt = f"{override_prompt} clean composition, no embedded text or logos."
+        target["prompt"] = override_prompt
     override_model = params.model.strip()
     if override_model and not is_valid_model_choice(override_model):
         return _error(
@@ -1026,8 +1055,8 @@ async def recover_stored_images(ctx, params: RecoverStoredImagesParams) -> Actio
 
 @chat.function(
     "delete_asset_image",
-    "Delete one stored image version from a media package. Choose original or upscaled; the other version and its metadata stay intact.",
-    action_type="write",
+    "Delete one stored image version from a media package. Choose original or upscaled; the other version and its metadata stay intact. Irreversible.",
+    action_type="destructive",
     data_model=MediaAsset,
     event="media-studio.delete_asset_image",
     effects=["update:media_package"],
@@ -1101,6 +1130,12 @@ async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
                 f"for English input. Found non-English text: '{non_english[:40]}'.",
                 c.MEDIA_PROMPT_NOT_ENGLISH,
             )
+        # Standing directive (2026-08-18): this writes straight into the
+        # asset's stored prompt, same bypass risk as regenerate_asset's
+        # prompt_override -- enforce the system-wide text ban here too.
+        prompt_config = await pe.get_prompt_config(ctx)
+        if prompt_config.get("forbid_image_text", True):
+            description = f"{description} clean composition, no embedded text or logos."
         # `prompt` is the canonical pipeline field: generation, regeneration,
         # exports and the card all read this same value.
         target["prompt"] = description
@@ -1130,7 +1165,7 @@ async def update_asset_meta(ctx, params: UpdateAssetMetaParams) -> ActionResult:
     "Permanently delete a media package and all of its asset records. Does "
     "not delete images already hosted on Magnific's own servers -- only the "
     "package record inside Media Hub.",
-    action_type="write",
+    action_type="destructive",
     data_model=DeleteResult,
     event="media-studio.delete_media_package",
     effects=["delete:media_package"],

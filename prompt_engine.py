@@ -141,6 +141,23 @@ _GENERIC_CAMERA = {
 }
 _GENERIC_STYLE = "professional editorial photography style"
 
+#: SYSTEM-LEVEL GUARANTEE (added 2026-08-18, per direct ask: "даже если
+#: отсутствует контекст в пайплайне -- проблем с этим не должно быть
+#: никогда"): Environment/Context used to be in `fix_prompt`'s `unfixable`
+#: bucket -- correct when the ONLY alternative was inventing a fake scene,
+#: but that left every caller with no context at all (a bare title, no
+#: summary, no visual_environment) producing a permanently-incomplete
+#: prompt. This clause is honestly generic (never claims a specific scene
+#: this engine has no evidence for) -- same discipline as generic lighting/
+#: camera/style above: it fills the STRUCTURAL slot with a safe, neutral
+#: default rather than leaving it empty, and a real `visual_environment`
+#: from the caller (see shared.prompt_for_role) always takes priority over
+#: this fallback.
+_GENERIC_ENVIRONMENT = (
+    "Set in a clean, realistic, well-lit professional environment consistent "
+    "with the subject matter."
+)
+
 
 #: Persisted, user-editable overrides for the four generic clauses above
 #: plus the review alert threshold -- one doc, defaults to the module
@@ -153,8 +170,22 @@ DEFAULT_PROMPT_CONFIG: dict = {
     "generic_camera_featured": _GENERIC_CAMERA["featured"],
     "generic_camera_inline": _GENERIC_CAMERA["inline"],
     "generic_style": _GENERIC_STYLE,
+    "generic_environment": _GENERIC_ENVIRONMENT,
     "score_alert_threshold": SCORE_ALERT_THRESHOLD,
+    # Standing directive (2026-08-18): generated images must never carry
+    # legible text UNLESS a human explicitly turns this off where it's
+    # appropriate (App settings > Image Prompt engine). Default True = the
+    # system-wide ban is ON out of the box. See `generate_prompt` below for
+    # WHERE this is enforced -- deliberately the single funnel every brief
+    # prompt passes through, so the ban holds even for a caller/pipeline
+    # stage that has no visual context at all to reason about text with.
+    "forbid_image_text": True,
 }
+
+#: Config keys that are booleans, not free text -- `save_prompt_config`
+#: needs to treat these differently from a blank-means-keep text field
+#: (an explicit `False` must be saveable, not treated as "blank").
+_BOOL_CONFIG_KEYS = frozenset({"forbid_image_text"})
 
 
 async def get_prompt_config(ctx) -> dict:
@@ -172,7 +203,10 @@ async def get_prompt_config(ctx) -> dict:
         if isinstance(raw, dict):
             for key in config:
                 value = raw.get(key)
-                if value not in (None, ""):
+                if key in _BOOL_CONFIG_KEYS:
+                    if value is not None:
+                        config[key] = bool(value)
+                elif value not in (None, ""):
                     config[key] = value
     return config
 
@@ -184,7 +218,9 @@ async def save_prompt_config(ctx, updates: dict) -> dict:
     textarea then clicking Apply Changes must fall back to the built-in
     default on next read, never blank out the clause entirely.
     `score_alert_threshold` is clamped to 0-100 and any non-numeric value
-    is ignored the same way.
+    is ignored the same way. Boolean keys (see `_BOOL_CONFIG_KEYS`) always
+    save whatever explicit True/False was given -- unlike a text field,
+    `False` is a real, meaningful, savable value, never "blank".
     """
     config = await get_prompt_config(ctx)
     for key, value in updates.items():
@@ -195,6 +231,8 @@ async def save_prompt_config(ctx, updates: dict) -> dict:
                 value = max(0, min(100, int(value)))
             except (TypeError, ValueError):
                 continue
+        elif key in _BOOL_CONFIG_KEYS:
+            value = bool(value)
         else:
             value = str(value).strip()
             if not value:
@@ -248,15 +286,19 @@ def analyze_prompt(prompt: str) -> dict:
 def fix_prompt(
     prompt: str, role: str = "featured", config: dict | None = None,
 ) -> tuple[str, list[str], list[str]]:
-    """Deterministically fix ONLY the structural slots this engine is
-    allowed to fill without guessing real content (lighting, camera,
-    generic style-fallback). Returns (fixed_prompt, additions, unfixable).
+    """Deterministically fix the structural slots this engine can fill
+    without guessing real content (lighting, camera, generic style, and
+    -- since 2026-08-18 -- generic environment) fallback). Returns
+    (fixed_prompt, additions, unfixable).
 
     `additions` lists what was appended, in plain English, so a caller can
     show exactly what changed -- never a silent rewrite. `unfixable`
-    carries any of {"subject", "environment"} still missing after the fix:
-    those need real words from the caller (article_title/summary/context),
-    which this engine will never invent.
+    carries any of {"subject", "composition"} still missing after the fix:
+    those genuinely need real words from the caller (article_title/summary/
+    visual_subject), which this engine will never invent. `environment` is
+    NO LONGER unfixable -- see `_GENERIC_ENVIRONMENT`'s docstring: a bare,
+    honestly-generic fallback is filled in rather than ever leaving the
+    slot empty, exactly like lighting/camera/style already did.
 
     `config`, if given, is an effective config dict shaped like
     `DEFAULT_PROMPT_CONFIG` (as returned by `get_prompt_config`) -- lets a
@@ -272,6 +314,7 @@ def fix_prompt(
         "inline": cfg.get("generic_camera_inline") or _GENERIC_CAMERA["inline"],
     }
     generic_style = cfg.get("generic_style") or _GENERIC_STYLE
+    generic_environment = cfg.get("generic_environment") or _GENERIC_ENVIRONMENT
 
     text = (prompt or "").strip()
     analysis = analyze_prompt(text)
@@ -295,7 +338,12 @@ def fix_prompt(
         additions.append(f"Added generic style fallback: \"{generic_style}\"")
         missing.discard("style")
 
-    unfixable = sorted(missing & {"subject", "environment", "composition"})
+    if "environment" in missing:
+        fixed = f"{fixed} {generic_environment}".strip()
+        additions.append(f"Added generic environment fallback: \"{generic_environment}\"")
+        missing.discard("environment")
+
+    unfixable = sorted(missing & {"subject", "composition"})
     return fixed, additions, unfixable
 
 
@@ -303,21 +351,48 @@ def generate_prompt(
     role: str, article_title: str, summary: str, style_direction: str,
     lang: str = "", text_policy: str = shared.TEXT_POLICY_NO_TEXT,
     image_text: str = "", config: dict | None = None,
+    visual_subject: str = "", visual_environment: str = "",
 ) -> str:
     """The engine's own entry point for BRIEF-TIME prompt generation --
     same inputs/output shape as `shared.prompt_for_role`, but auto-enriched
-    with a lighting/camera clause when the base construction doesn't
-    already carry one (e.g. no style_direction was given, or it didn't
-    mention either). This is the function `create_media_brief` calls; the
-    underlying `shared.prompt_for_role` keeps working exactly as before for
-    any other caller/test that still calls it directly.
+    with a lighting/camera/environment clause when the base construction
+    doesn't already carry one (e.g. no style_direction was given, or it
+    didn't mention either). This is the function `create_media_brief`
+    calls; the underlying `shared.prompt_for_role` keeps working exactly as
+    before for any other caller/test that still calls it directly.
+
+    `visual_subject`/`visual_environment`: pass through to
+    `shared.prompt_for_role` -- see its docstring. Giving real values here
+    (e.g. from Content Strategy Hub's approved_visual_guidance) is always
+    preferred; when omitted, `fix_prompt` below still guarantees Environment
+    is never left blank via `_GENERIC_ENVIRONMENT`. This is the two-layer
+    guarantee: real context wins when available, an honest generic
+    fallback covers the case where the caller had none at all -- Subject
+    is the one slot this engine will never fabricate, by design.
 
     `config`: see `fix_prompt` -- pass the user's saved settings (fetched
     once via `await get_prompt_config(ctx)`) so brief-time generation
     reflects whatever was last saved from App settings.
+
+    TEXT BAN ENFORCEMENT (standing directive, 2026-08-18): when
+    `config["forbid_image_text"]` is true (the default), `text_policy` is
+    forced to `shared.TEXT_POLICY_NO_TEXT` here, UNCONDITIONALLY, no matter
+    what a caller asked for -- this is the one funnel every brief-time
+    prompt passes through, so the ban holds system-wide even for a pipeline
+    stage that has no visual-brand context at all to reason with. A missing
+    `config` (a legacy/test caller that never fetched one) defaults to
+    banned too, via `effective_config` below -- there is no code path where
+    "no config" quietly means "text allowed". Only an explicit, human-saved
+    `forbid_image_text: False` in App settings lets `text_policy`/
+    `image_text` through as given.
     """
+    effective_config = config if config is not None else DEFAULT_PROMPT_CONFIG
+    if effective_config.get("forbid_image_text", True):
+        text_policy = shared.TEXT_POLICY_NO_TEXT
+        image_text = ""
     base = shared.prompt_for_role(
         role, article_title, summary, style_direction, lang, text_policy, image_text,
+        visual_subject, visual_environment,
     )
     fixed, _additions, _unfixable = fix_prompt(base, role, config)
     return fixed

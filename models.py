@@ -132,6 +132,24 @@ class CreateMediaBriefParams(BaseModel):
                         "correct for the post instead of defaulting to English. "
                         "Omit to fall back to article_title (English default, "
                         "same as v1 behaviour).")
+    visual_subject: str = Field(
+        "", description="What is physically IN the shot and what it's doing -- "
+                        "e.g. 'a certified technician inspecting an installed "
+                        "heat-recovery ventilator unit'. A SEO article_title names "
+                        "a TOPIC, not a scene, so pass this whenever the caller has "
+                        "a real, non-generic visual description (e.g. Content "
+                        "Strategy Hub deriving it from the brief's own primary_query "
+                        "+ resolved_category). Never invented here if omitted -- "
+                        "the prompt engine falls back to article_title/summary, "
+                        "same as before this field existed.")
+    visual_environment: str = Field(
+        "", description="Where the shot is set -- e.g. 'a modern residential "
+                        "living room with large windows'. Pass this whenever the "
+                        "caller has a real scene/setting description (e.g. from an "
+                        "approved Visual Profile's visual_intent). If omitted, this "
+                        "is NEVER left blank in the final prompt: the engine always "
+                        "appends an honestly-generic environment fallback so the "
+                        "Environment/Context slot is guaranteed filled either way.")
 
 
 class GenerateMediaPackageParams(BaseModel):
@@ -350,7 +368,10 @@ class SavePromptEngineConfigParams(BaseModel):
     """Every field is optional and free text/number -- a blank text field
     means 'keep the current value' (see prompt_engine.save_prompt_config),
     so the App settings form can submit all fields every time without
-    accidentally blanking out ones the user didn't touch."""
+    accidentally blanking out ones the user didn't touch. `forbid_image_text`
+    is the one boolean field here -- unlike the text fields, an explicit
+    True/False always saves (there's no meaningful 'blank' checkbox
+    state)."""
     generic_lighting: str = Field(
         "", description="Lighting clause auto-appended when a prompt is "
                         "missing lighting language.")
@@ -367,6 +388,14 @@ class SavePromptEngineConfigParams(BaseModel):
         "", description="Below this average rubric score (0-100), the "
                         "monthly self-review flags 'review recommended'. "
                         "Leave blank to keep the current value.")
+    forbid_image_text: bool = Field(
+        True, description="Ban legible text (labels, captions, signage) "
+                        "in every generated image, system-wide. On by "
+                        "default. Turn off ONLY where rendering exact "
+                        "words in-image is genuinely appropriate -- doing "
+                        "so still requires the caller to supply the exact "
+                        "wording via image_text; this toggle only lifts "
+                        "the blanket ban, it never invents text itself.")
 
 
 class PromptEngineConfig(sdl.Entity):
@@ -377,6 +406,8 @@ class PromptEngineConfig(sdl.Entity):
     generic_camera_inline: str = ""
     generic_style: str = ""
     score_alert_threshold: int = 0
+    forbid_image_text: bool = True
+
 
 
 class ListPromptEngineLogParams(BaseModel):

@@ -23,7 +23,7 @@ from imperal_sdk import Extension, ChatExtension
 
 ext = Extension(
     "media-studio",
-    version="1.1.0",
+    version="1.2.0",
     display_name="Media Hub",
     description=(
         "Turn an article brief into a ready-to-publish image package -- "
