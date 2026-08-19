@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-19 — Plausible Scenario Testing (PST) — 1 непокрытая функция закрыта
+
+Полный метод и детали — в `SCENARIO_TESTS.md` этого приложения. Кратко:
+из 24 функций и 308 существующих тестов только `recover_stored_images`
+никогда не вызывалась на уровне хендлера — закрыто 5 новыми тестами в
+`tests/test_pst_scenarios.py` (blocked/happy no-op/happy full
+recovery/error/adversarial-idempotent). Полный набор (313 тестов) зелёный.
+Реальных багов не найдено.
+
+---
+
 ## 2026-08-19 — Сквозной пост-аудит + исправление неверной классификации action_type
 
 **Что проверялось:** py_compile всех 17 модулей; количество `@chat.function`
