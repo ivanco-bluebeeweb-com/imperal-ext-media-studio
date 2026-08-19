@@ -136,3 +136,67 @@ async def test_adversarial_recover_stored_images_no_match_leaves_asset_unchanged
     out = await h.recover_stored_images(ctx_with_key, RecoverStoredImagesParams())
     assert out.error is None
     assert "0 image" in out.summary or "could not be restored" in out.summary
+
+
+# ── Part D2 (SCENARIO_TESTING_STANDARD.md): idempotency / double-invocation ─
+
+@pytest.mark.asyncio
+async def test_d2_double_delete_media_package_fails_clean_on_the_second_call(ctx):
+    """delete_media_package checks store existence before deleting -- a
+    retried delete on a package already removed by the first call must
+    return a clean not-found error, never crash or repeat deleted=true
+    about something no longer there."""
+    from models import DeleteMediaPackageParams
+    doc_id, _ = await st.create_package(ctx, _legacy_package())
+
+    first = await h.delete_media_package(ctx, DeleteMediaPackageParams(package_id=doc_id))
+    assert first.error is None
+
+    second = await h.delete_media_package(ctx, DeleteMediaPackageParams(package_id=doc_id))
+    assert second.error is not None
+
+
+@pytest.mark.asyncio
+async def test_d2_double_delete_asset_image_is_idempotent(ctx):
+    """delete_asset_image blanks the stored path/url fields on the target
+    asset -- calling it again on the same role+version after they're
+    already blank must stay a clean success (nothing left to clear), not
+    error or corrupt the asset record."""
+    from models import DeleteAssetImageParams
+    pkg = _legacy_package()
+    pkg["assets"][0]["original_storage_path"] = "some/path.png"
+    doc_id, _ = await st.create_package(ctx, pkg)
+
+    first = await h.delete_asset_image(
+        ctx, DeleteAssetImageParams(package_id=doc_id, role=pkg["assets"][0]["role"], version="original"))
+    assert first.error is None
+
+    second = await h.delete_asset_image(
+        ctx, DeleteAssetImageParams(package_id=doc_id, role=pkg["assets"][0]["role"], version="original"))
+    assert second.error is None
+
+
+# ── Part D3 (SCENARIO_TESTING_STANDARD.md): security / SSRF surface -------
+
+def test_d3_no_ssrf_download_image_bytes_only_ever_called_with_provider_urls():
+    """download_image_bytes uses a raw httpx.AsyncClient (by design, to
+    avoid ctx.http's text-decoding of binary bytes -- see its own docstring)
+    fetching whatever URL it's given, with no host allowlist of its own.
+    This is only safe because every call site feeds it a URL that ITSELF
+    came from a Magnific/Freepik API response (generation result, upscale
+    result, Mystic task lookup) -- never a raw string typed by the chat
+    user. Confirmed by grep: every handlers.py call site passes an
+    `*_url` variable sourced from mc.generate_image/mc.upscale_image/
+    mc.poll_mystic_task's own return values, not a request parameter.
+    This is a regression trip-wire: if a future handler ever threads a
+    user-supplied url straight into download_image_bytes, that call site
+    needs its own explicit SSRF review."""
+    import inspect
+    import handlers as h
+    src = inspect.getsource(h)
+    for line in src.splitlines():
+        if "download_image_bytes(" in line and "def " not in line:
+            arg = line.split("download_image_bytes(")[1].split(")")[0]
+            assert "params." not in arg, (
+                f"download_image_bytes called with a request-parameter-derived "
+                f"argument, not a provider-returned url: {line.strip()}")
