@@ -42,3 +42,18 @@ def ctx_with_key(ctx):
     from imperal_sdk.testing import MockSecretStore
     ctx.secrets = MockSecretStore({"magnific_api_key": "test-key-123"})
     return ctx
+
+
+@pytest.fixture
+def ctx_with_valid_key(ctx_with_key):
+    """A key that IS stored AND passes a live Magnific check (200)."""
+    ctx_with_key.http.mock_get("/v1/creations/recent", {"data": []}, status=200)
+    return ctx_with_key
+
+
+@pytest.fixture
+def ctx_with_broken_key(ctx_with_key):
+    """A key that IS stored but Magnific itself now rejects (401) -- the
+    Task #2236 case: the secret still exists, it just stopped working."""
+    ctx_with_key.http.mock_get("/v1/creations/recent", {"error": "unauthorized"}, status=401)
+    return ctx_with_key

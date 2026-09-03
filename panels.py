@@ -43,7 +43,7 @@ import prompt_engine as pe
 import magnific_client as mc
 import storage as st
 import model_registry as mr
-from providers import list_provider_connections
+from providers import list_provider_connections, magnific_live_status
 from shared import MYSTIC_MODELS
 
 # Google Imagen 4 Ultra/Fast are excluded here on purpose -- standing user
@@ -107,8 +107,7 @@ async def _projects_section(ctx, site: str, show_add_project: str) -> ui.UINode:
     ]
 
     add_project_button = ui.Button(
-        "➕ Add new project", variant="secondary", size="sm", full_width=True,
-        on_click=ui.Call("__panel__packages_nav", site=site, show_add_project="1"),
+        "➕ Add new project", variant="secondary", size="sm", on_click=ui.Call("__panel__packages_nav", site=site, show_add_project="1"),
     )
 
     children: list[ui.UINode] = [add_project_button]
@@ -159,16 +158,36 @@ async def packages_nav_panel(ctx, site: str = "", show_add_project: str = "", **
     after a Divider. Provider connection status (Magnific, and later other
     providers) lives INSIDE the settings screen itself, not duplicated here
     as a preview line -- one place to look, not two.
+
+    EXCEPTION: a BROKEN connection (key rejected/expired) is surfaced here
+    too, as a yellow warning Alert directly above "App settings" -- same
+    reasoning and same placement as Google Analytics's sidebar reconnect
+    Alert (see analytics_nav / _reconnect_children in that extension's
+    panels.py). Task #2236 (Magnific 401 silently stalling image
+    generation) and Task #2239 (no system-level alert existed anywhere in
+    the panel for that) are why this exists: a stale key must be visible
+    the moment the sidebar renders, not only after opening Settings.
     """
     projects_section = await _projects_section(ctx, site, show_add_project)
 
     settings_button = ui.Button(
         "App settings", icon="Settings", variant="secondary", size="sm",
-        full_width=True,
         on_click=ui.Call("__panel__studio", view="settings"),
     )
 
-    return ui.Stack(children=[projects_section, ui.Divider(), settings_button], gap=3)
+    children = [projects_section, ui.Divider()]
+    status = await magnific_live_status(ctx)
+    if status == "reconnect_required":
+        children.append(ui.Alert(
+            title="Magnific needs attention",
+            message="Magnific rejected the saved API key, so image "
+                    "generation is blocked. Open App settings -> Image "
+                    "provider and reconnect with a fresh key.",
+            type="warning",
+        ))
+    children.append(settings_button)
+
+    return ui.Stack(children=children, gap=3)
 
 
 # ── App settings screen -- EVERYTHING configurable, one place ──────────────

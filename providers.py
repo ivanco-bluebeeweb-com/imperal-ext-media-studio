@@ -56,6 +56,30 @@ async def list_provider_connections(ctx) -> list[ProviderConnection]:
     return [await _magnific_connection(ctx)]
 
 
+async def magnific_live_status(ctx) -> str:
+    """Live probe against Magnific itself -- 'not_connected' | 'connected' |
+    'reconnect_required'. Mirrors Google Analytics's handlers_accounts.py
+    live_status(): a saved key is not proof it still works (Magnific can
+    revoke/expire it any time, see Task #2236's silent-stall case), only an
+    actual call against Magnific's own API proves that.
+
+    Deliberately a SEPARATE function from `_magnific_connection` (used by
+    list_providers/connect/disconnect): those must stay a cheap is_set()
+    check with no network call and no behaviour change, since chat tools
+    and their tests assert on that exact fast shape. This one exists solely
+    to drive the sidebar warning banner (packages_nav_panel), the same way
+    GA4's live_status exists solely to drive its own sidebar Alert.
+    """
+    api_key = await ctx.secrets.get("magnific_api_key")
+    if not api_key:
+        return "not_connected"
+    try:
+        await mc.validate_api_key(ctx, api_key)
+    except mc.ProviderError:
+        return "reconnect_required"
+    return "connected"
+
+
 @chat.function(
     "list_providers",
     "List every image-generation provider Media Hub knows about, and "

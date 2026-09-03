@@ -352,9 +352,38 @@ async def test_sidebar_is_settings_only_not_a_second_brief_catalog(ctx_with_key)
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Sidebar "Projects" = existing connected sites, an "Add new project" Dialog,
-# and a project-scoped center brief catalogue (same look as _packages_view).
+# Sidebar warning banner for a broken Magnific connection (Task #2236 / #2239):
+# a saved key Magnific has since rejected must surface as a yellow Alert
+# directly above "App settings", the same placement/pattern Google
+# Analytics uses for its own broken-connection sidebar Alert.
 # ──────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sidebar_warns_when_saved_key_is_rejected(ctx_with_broken_key):
+    node = await panels.packages_nav_panel(ctx_with_broken_key)
+    rendered = repr(node)
+    assert "Magnific needs attention" in rendered
+    assert "reconnect" in rendered.lower()
+    assert "App settings" in rendered
+    # The warning must render BEFORE (above) the settings button.
+    assert rendered.index("needs attention") < rendered.index("'label': 'App settings'")
+
+
+@pytest.mark.asyncio
+async def test_sidebar_has_no_warning_when_key_is_valid(ctx_with_valid_key):
+    node = await panels.packages_nav_panel(ctx_with_valid_key)
+    rendered = repr(node)
+    assert "needs attention" not in rendered
+    assert "type='Alert'" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_sidebar_has_no_warning_when_never_connected(ctx):
+    node = await panels.packages_nav_panel(ctx)
+    rendered = repr(node)
+    assert "needs attention" not in rendered
+    assert "type='Alert'" not in rendered
+
 
 @pytest.mark.asyncio
 async def test_sidebar_shows_projects_section_with_add_button(ctx_with_key):
