@@ -418,7 +418,16 @@ def _provider_form_children(connected: bool) -> list[ui.UINode]:
         action="connect_magnific",
         submit_label="Verify and connect",
         children=[
-            ui.Password(param_name="api_key", placeholder="Magnific API key"),
+            ui.Password(
+                param_name="api_key",
+                label="API Key",
+                placeholder="Magnific API key (starts with MS...)",
+            ),
+            ui.Password(
+                param_name="webhook_secret",
+                label="Webhook Secret (Optional)",
+                placeholder="Webhook secret for signing callbacks",
+            ),
         ],
     ))
     if connected:

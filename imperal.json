@@ -4829,6 +4829,12 @@
             "description": "Magnific API key to validate and save for this user.",
             "title": "Api Key",
             "type": "string"
+          },
+          "webhook_secret": {
+            "default": "",
+            "description": "Optional Magnific webhook signing secret shown alongside the API key.",
+            "title": "Webhook Secret",
+            "type": "string"
           }
         },
         "title": "ConnectMagnificParams",

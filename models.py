@@ -34,6 +34,9 @@ class ConnectMagnificParams(BaseModel):
     api_key: str = Field(
         "", description="Magnific API key to validate and save for this user."
     )
+    webhook_secret: str = Field(
+        "", description="Optional Magnific webhook signing secret shown alongside the API key."
+    )
 
 
 class ProviderConnection(sdl.Entity):

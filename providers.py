@@ -126,6 +126,9 @@ async def connect_magnific(ctx, params: ConnectMagnificParams) -> ActionResult:
         return _error(str(exc), exc.code)
 
     await ctx.secrets.set("magnific_api_key", api_key)
+    webhook_secret = (params.webhook_secret or "").strip()
+    if webhook_secret:
+        await ctx.secrets.set("magnific_webhook_secret", webhook_secret)
     connection = await _magnific_connection(ctx)
     return ActionResult.success(
         connection, "Magnific connected -- the key was verified before saving.",
