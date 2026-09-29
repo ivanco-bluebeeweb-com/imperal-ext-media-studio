@@ -68,7 +68,7 @@ ext.secret(
         "on inbound webhooks, so this is not read by any handler yet."
     ),
     required=False,
-    write_mode="user",
+    write_mode="both",
     max_bytes=200,
     rotation_hint_days=90,
 )(lambda: None)
