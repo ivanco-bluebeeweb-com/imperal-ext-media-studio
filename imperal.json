@@ -5094,7 +5094,7 @@
       "name": "magnific_webhook_secret",
       "description": "Webhook signing secret shown alongside your Magnific API key. Stored for future use -- v1 polls task status instead of relying on inbound webhooks, so this is not read by any handler yet.",
       "required": false,
-      "write_mode": "user",
+      "write_mode": "both",
       "max_bytes": 200,
       "scope": "user",
       "rotation_hint_days": 90
